@@ -63,7 +63,7 @@ function DeepDiveContent() {
     setReflectionContext('')
     setError('')
     setIsLoading(true)
-    if (!verseText) {
+    if (isSermonMode && !verseText) {
       setError("Please go back and try again")
       setIsLoading(false)
       return
@@ -237,7 +237,7 @@ function DeepDiveContent() {
               className="w-full flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-xl font-semibold shadow-lg active:scale-[0.98] transition-transform"
             >
               <span className="material-symbols-outlined">forum</span>
-              Talk About This
+              Text Chat — Premium
             </button>
           </div>
         )}

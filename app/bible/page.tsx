@@ -7,6 +7,8 @@ import type { AnalyticsScripture } from "@/lib/analytics/contract"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useSubscription } from "@/context/subscription-context"
+import EmailGate from "@/components/email-gate"
+import { LanguageSelector } from "@/components/language-selector"
 import { HeaderDropdown } from "@/components/header-dropdown"
 import { useChurch } from "@/context/church-context"
 import { resolveScriptureLink } from "@/lib/scripture-link"
@@ -35,6 +37,7 @@ type ViewMode = "books" | "chapters" | "reading"
 export default function BiblePage() {
   const router = useRouter()
   const { canAccessPremium } = useSubscription()
+  const [needsEmail, setNeedsEmail] = useState(false)
   const { church, isLoading: churchLoading } = useChurch()
   const openedLink = useRef(false)
   const linkedVerse = useRef<number | undefined>(undefined)
@@ -305,8 +308,8 @@ export default function BiblePage() {
 
   // Explain selected text
   const explainSelection = async () => {
-    if (!canAccessPremium) {
-      setShowUpgradePrompt(true)
+    if (!JSON.parse(localStorage.getItem("userProfile") || "{}").email) {
+      setNeedsEmail(true)
       setShowExplainButton(false)
       return
     }
@@ -330,7 +333,8 @@ export default function BiblePage() {
         body: JSON.stringify({
           selectedText,
           reference,
-          ageRange: profile.ageRange || "adult",
+          profile,
+          ageRange: canAccessPremium ? profile.ageRange || "adult" : "adult",
           language: profile.language || "en"
         })
       })
@@ -368,12 +372,15 @@ export default function BiblePage() {
     window.getSelection()?.removeAllRanges()
   }
 
+  useEffect(() => { if (contentRef.current) contentRef.current.scrollTop = 0 }, [viewMode, selectedChapter])
+
   const books = testament === "old" ? booksData?.oldTestament : booksData?.newTestament
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col bg-[#0c1929] max-w-md mx-auto shadow-2xl">
+    <div className="relative flex h-[100dvh] overflow-hidden w-full flex-col bg-[#0c1929] max-w-md mx-auto shadow-2xl">
+      {needsEmail && <div className="fixed inset-0 z-[100] overflow-auto"><EmailGate required onContinue={() => setNeedsEmail(false)}><button onClick={() => setNeedsEmail(false)}>Continue reading</button></EmailGate></div>}
       {/* Header */}
-      <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between px-4 bg-[#0c1929]/95 backdrop-blur-sm border-b border-white/10">
+      <header className="relative z-40 flex min-h-16 shrink-0 w-full items-center justify-between px-4 bg-[#0c1929]/95 backdrop-blur-sm border-b border-white/10">
         <button
           onClick={() => {
             chapterRequest.current++
@@ -407,11 +414,12 @@ export default function BiblePage() {
               </option>
             ))}
           </select>
+          <LanguageSelector />
           <HeaderDropdown verseReference={viewMode === "reading" ? `${selectedBook?.name} ${selectedChapter}` : undefined} />
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto" ref={contentRef}>
+      <main className="min-h-0 flex-1 overflow-y-auto pb-8 scroll-pt-4" ref={contentRef}>
         {linkNotice && <p className="p-4 text-blue-100 text-sm" role="status">{linkNotice}</p>}
         {chapterError && <p className="p-4 text-amber-200 text-sm" role="alert">{chapterError}</p>}
         {/* BOOKS VIEW */}

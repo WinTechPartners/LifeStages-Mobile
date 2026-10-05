@@ -1,6 +1,8 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from "react"
+import { apiFetch } from "@/lib/api-base"
+import { isNative } from "@/lib/native-features"
 import {
   initializeIAP,
   getProducts,
@@ -111,6 +113,18 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEYS.USER_EMAIL, normalized)
   }, [])
 
+  useEffect(() => {
+    const sync = () => {
+      try {
+        const email = JSON.parse(localStorage.getItem('userProfile') || '{}').email || null
+        setUserEmailState(email)
+      } catch { /* Invalid profile does not grant access. */ }
+    }
+    window.addEventListener('profile-updated', sync)
+    window.addEventListener('lifestages-profile-changed', sync)
+    return () => { window.removeEventListener('profile-updated', sync); window.removeEventListener('lifestages-profile-changed', sync) }
+  }, [])
+
   // Initialize IAP and load products + current subscription
   useEffect(() => {
     const init = async () => {
@@ -126,7 +140,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           profileEmail = parsed.email
         }
       } catch {}
-      const email = storedEmail || profileEmail
+      const email = profileEmail || storedEmail
       if (email) {
         setUserEmailState(email)
         localStorage.setItem(STORAGE_KEYS.USER_EMAIL, email)
@@ -149,6 +163,23 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     init()
   }, [])
 
+  useEffect(() => {
+    if (!userEmail) {
+      if (!isNative()) setSubscriptionInfo({status:'none',productId:null,expiresAt:null,isTrialing:false,willRenew:false})
+      return
+    }
+    if (!isNative()) setSubscriptionInfo({status:'none',productId:null,expiresAt:null,isTrialing:false,willRenew:false})
+    let current = true
+    apiFetch('/api/stripe/status', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email:userEmail}) })
+      .then(r => r.ok ? r.json() : null).then(data => {
+        if (!current || !data) return
+        if (data.isActive) setSubscriptionInfo({status:data.isTrialing ? 'trialing' : 'active', productId:null,
+          expiresAt:data.trialEndsAt ? new Date(data.trialEndsAt).getTime() : null, isTrialing:!!data.isTrialing, willRenew:!data.ownerAccess})
+        else if (!isNative()) setSubscriptionInfo({status:'none',productId:null,expiresAt:null,isTrialing:false,willRenew:false})
+      }).catch(() => {}).finally(() => {if(current) setIsLoading(false)})
+    return () => { current = false }
+  }, [userEmail])
+
   // Determine tier
   const tier = useMemo((): SubscriptionTier => {
     if (subscriptionInfo.status === "trialing") return "trial"
@@ -160,7 +191,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const isPremium = tier === "premium"
   const isTrialActive = tier === "trial"
   const canAccessPremium = isPremium || isTrialActive
-  const canAccessCore = canAccessPremium
+  const canAccessCore = true
   const canSearchCustomVerse = canAccessCore
   const subscriptionStatus = subscriptionInfo.status
 
@@ -199,19 +230,24 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     })
   }, [tier])
 
-  const canUseVoice = isPremium || isTrialActive || voiceUsage.checkInsUsed < voiceUsage.checkInsLimit
+  const canUseVoice = false
 
-  const useVoiceCheckIn = useCallback((): boolean => {
-    if (isPremium || isTrialActive) return true
-    if (voiceUsage.checkInsUsed >= voiceUsage.checkInsLimit) return false
-    const newUsage = { ...voiceUsage, checkInsUsed: voiceUsage.checkInsUsed + 1 }
-    setVoiceUsage(newUsage)
-    localStorage.setItem(STORAGE_KEYS.VOICE_USAGE, JSON.stringify(newUsage))
-    return true
-  }, [isPremium, isTrialActive, voiceUsage])
+  const useVoiceCheckIn = useCallback((): boolean => false, [])
+
+  useEffect(() => { localStorage.setItem('lifestages-access', canAccessPremium ? 'premium' : 'free') }, [canAccessPremium])
+
+  const webCheckout = useCallback(async (priceType: 'monthly' | 'yearly', suppliedEmail?: string) => {
+    const email = suppliedEmail || userEmail || JSON.parse(localStorage.getItem('userProfile') || '{}').email
+    if (!email) { window.location.assign('/subscription'); throw new Error('Enter your email to start your free trial.') }
+    const response = await apiFetch('/api/stripe/checkout', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priceType,email})})
+    const data = await response.json()
+    if (!response.ok || !data.url) throw new Error(data.error || 'Checkout could not start. Please try again.')
+    window.location.assign(data.url)
+  }, [userEmail])
 
   // Purchase a product via native IAP
   const purchase = useCallback(async (productId: string): Promise<boolean> => {
+    if (!isNative()) { await webCheckout(productId === PRODUCT_IDS.YEARLY ? "yearly" : "monthly"); return false }
     try {
       const success = await purchaseProduct(productId)
       if (success) {
@@ -224,7 +260,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       console.error("[Subscription] Purchase failed:", e)
       return false
     }
-  }, [])
+  }, [webCheckout])
 
   // Restore purchases
   const restore = useCallback(async (): Promise<boolean> => {
@@ -246,13 +282,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Legacy compatibility — these map to native IAP now
-  const checkout = useCallback(async (priceType: "monthly" | "yearly") => {
+  const checkout = useCallback(async (priceType: "monthly" | "yearly", email?: string) => {
+    if (!isNative()) { await webCheckout(priceType, email); return }
     const productId = priceType === "yearly" ? PRODUCT_IDS.YEARLY : PRODUCT_IDS.MONTHLY
     await purchase(productId)
-  }, [purchase])
+  }, [purchase, webCheckout])
 
   const startTrial = useCallback(() => {
-    checkout("monthly")
+    checkout("monthly").catch(console.error)
   }, [checkout])
 
   const upgradeToPaid = useCallback(

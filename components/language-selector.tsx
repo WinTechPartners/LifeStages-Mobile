@@ -26,7 +26,8 @@ export function LanguageSelector({ variant = "compact" }: LanguageSelectorProps)
     return (
       <div className="relative" ref={dropdownRef}>
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          aria-label="Choose language"
+        onClick={() => setIsOpen(!isOpen)}
           className="flex w-full items-center justify-between rounded-xl border border-border bg-card h-14 px-4 text-base font-normal shadow-sm transition-all hover:bg-muted"
         >
           <span className="flex items-center gap-3">
@@ -66,6 +67,7 @@ export function LanguageSelector({ variant = "compact" }: LanguageSelectorProps)
   return (
     <div className="relative" ref={dropdownRef}>
       <button
+        aria-label="Choose language"
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 transition-colors border border-white/20"
       >

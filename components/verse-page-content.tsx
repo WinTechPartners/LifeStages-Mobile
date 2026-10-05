@@ -1,4 +1,5 @@
 "use client"
+import { AppImage } from "@/components/app-image"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -36,11 +37,12 @@ export default function VersePageContent() {
     }
   }
 
-  const lifelinesLimitText = tier === "free" ? "Upgrade for access" : "5/day"
+  const lifelinesLimitText = tier === "free" ? "Free with email · generic" : "Personalized with Premium"
   const showChurchBranding = hasChurch && !churchLoading
 
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-md mx-auto bg-[#0c1929] shadow-2xl">
+      <p className="px-6 pt-5 pr-16 text-sm text-blue-200">Generic content is free with email. Premium personalizes everything.</p>
       {/* Three Dots Menu */}
       <div className="absolute top-4 right-4 z-20">
         <HeaderDropdown verseReference={devotional.verse?.reference} />
@@ -113,7 +115,7 @@ export default function VersePageContent() {
         <div className="flex flex-col items-center text-center px-6 pt-8 pb-4">
           {showChurchBranding && logo ? (
             <>
-              <img src={logo} alt={church?.name || "Church"} className="h-20 w-auto mb-3" />
+              <AppImage src={logo} alt={church?.name || "Church"} className="h-20 w-auto mb-3" />
               <h1 className="text-xl font-bold tracking-tight text-white">{church?.name}</h1>
               <p className="text-xs text-blue-200/80 mt-1">Scripture that speaks to where you are</p>
             </>
@@ -169,7 +171,7 @@ export default function VersePageContent() {
             
             <div className="grid grid-cols-2 gap-3 mb-4">
               {features.map((item, idx) => {
-                const isLocked = !canAccessCore
+                const isLocked = false
                 return (
                   <button
                     key={idx}
@@ -198,8 +200,8 @@ export default function VersePageContent() {
                 <span className="material-symbols-outlined">forum</span>
               </div>
               <div className="flex-1 text-left">
-                <span className="font-bold text-gray-900 block">Let's Talk</span>
-                <span className="text-xs text-indigo-600 font-medium">Chat about today's verse</span>
+                <span className="font-bold text-gray-900 block">Text Chat — Premium</span>
+                <span className="text-xs text-indigo-600 font-medium">Voice Chat: Coming Soon — Premium Plus</span>
               </div>
               <span className="material-symbols-outlined text-gray-400">arrow_forward</span>
             </button>
@@ -209,7 +211,7 @@ export default function VersePageContent() {
         {/* Find a Verse */}
         <div className="px-4 pb-4">
           <button
-            onClick={() => canAccessCore ? router.push("/selection") : router.push("/subscription")}
+            onClick={() => router.push("/selection")}
             className="w-full flex items-center p-4 bg-gray-900/50 backdrop-blur rounded-xl border border-amber-400/30 transition-all active:scale-[0.98]"
           >
             <div className="size-10 rounded-full bg-amber-500 text-white flex items-center justify-center mr-3">

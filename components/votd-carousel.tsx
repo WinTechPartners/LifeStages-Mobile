@@ -1,4 +1,5 @@
 "use client"
+import { AppImage } from "@/components/app-image"
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { hapticMedium, hapticTap, nativeShare, getCachedVerseForDate, cacheVerseForDate, type CachedVerse } from "@/lib/native-features"
@@ -319,10 +320,10 @@ export function VOTDCarousel({
                 {/* Hero Image */}
                 {day.heroImage ? (
                   <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/40">
-                    <img
+                    <AppImage
                       src={day.heroImage}
                       alt="Verse illustration"
-                      className="w-full aspect-[16/10] object-cover"
+                      className="w-full h-40 object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0c1929] via-transparent to-transparent" />
                     <button
@@ -338,12 +339,12 @@ export function VOTDCarousel({
                     )}
                   </div>
                 ) : day.isLoading || (day.isToday && todayIsLoading) ? (
-                  <div className="w-full aspect-[16/10] bg-gradient-to-br from-indigo-900/40 to-blue-900/40 rounded-2xl flex flex-col items-center justify-center border border-white/5">
+                  <div className="w-full h-40 bg-gradient-to-br from-indigo-900/40 to-blue-900/40 rounded-2xl flex flex-col items-center justify-center border border-white/5">
                     <div className="size-8 border-3 border-amber-400/40 border-t-amber-400 rounded-full animate-spin mb-2" />
                     <p className="text-xs text-blue-200/40">Creating your image...</p>
                   </div>
                 ) : day.verse ? (
-                  <div className="w-full aspect-[16/10] bg-gradient-to-br from-indigo-900/30 to-purple-900/30 rounded-2xl flex items-center justify-center border border-white/5">
+                  <div className="w-full h-40 bg-gradient-to-br from-indigo-900/30 to-purple-900/30 rounded-2xl flex items-center justify-center border border-white/5">
                     <span className="material-symbols-outlined text-amber-400/30 text-5xl">image</span>
                   </div>
                 ) : null}
@@ -399,9 +400,9 @@ export function VOTDCarousel({
                         <span className="material-symbols-outlined text-white text-base">auto_awesome</span>
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-white">What This Means For You</h3>
+                        <h3 className="text-sm font-bold text-white">Friendly Breakdown</h3>
                         {!canAccessPremium && (
-                          <span className="text-[9px] text-blue-200/40">Generic · Upgrade for personalized</span>
+                          <span className="text-[9px] text-blue-200/40">Free · Generic. Premium adds personalization.</span>
                         )}
                       </div>
                     </div>

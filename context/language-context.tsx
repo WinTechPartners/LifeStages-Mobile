@@ -347,6 +347,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const setLanguage = (lang: LanguageCode) => {
     setLanguageState(lang)
     localStorage.setItem("userLanguage", lang)
+    try {
+      const profile = JSON.parse(localStorage.getItem('userProfile') || '{}')
+      localStorage.setItem('userProfile', JSON.stringify({...profile, language:lang}))
+    } catch { /* The language preference remains usable without a profile. */ }
   }
 
   const t = (key: string): string => {

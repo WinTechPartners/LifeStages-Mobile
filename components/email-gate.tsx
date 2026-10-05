@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSubscription } from "@/context/subscription-context"
 import { usePathname } from "next/navigation"
 
-export default function EmailGate({ children }: { children: React.ReactNode }) {
+export default function EmailGate({ children, required = false, onContinue }: { children: React.ReactNode; required?: boolean; onContinue?: () => void }) {
   const pathname = usePathname()
+  const { setUserEmail, userEmail } = useSubscription()
   const [email, setEmail] = useState("")
   const [hasEmail, setHasEmail] = useState<boolean | null>(null) // null = loading
   const [error, setError] = useState("")
@@ -21,7 +23,7 @@ export default function EmailGate({ children }: { children: React.ReactNode }) {
       } catch {}
     }
     setHasEmail(false)
-  }, [])
+  }, [pathname, userEmail])
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -37,11 +39,14 @@ export default function EmailGate({ children }: { children: React.ReactNode }) {
     const profile = existing ? JSON.parse(existing) : {}
     profile.email = trimmed
     localStorage.setItem("userProfile", JSON.stringify(profile))
+    setUserEmail(trimmed)
+    window.dispatchEvent(new Event("profile-updated"))
     setHasEmail(true)
+    onContinue?.()
   }
 
   // Leader authentication is independent from a member's local profile.
-  if (pathname === '/church/manage' || pathname === '/connect' || pathname === '/privacy' || pathname === '/terms') return <>{children}</>
+  if (!required && (['/', '/bible', '/verse'].includes(pathname) || pathname === '/church/manage' || pathname === '/connect' || pathname === '/privacy' || pathname === '/terms')) return <>{children}</>
 
   // Loading state
   if (hasEmail === null) {
@@ -68,7 +73,7 @@ export default function EmailGate({ children }: { children: React.ReactNode }) {
           </div>
           <h1 className="text-2xl font-bold text-white">Bible for Life Stages</h1>
           <p className="text-blue-200/60 text-sm leading-relaxed">
-            One verse, every morning, personally explained for exactly where you are in life.
+            Free verse explanations and all Lifelines. Premium adds personalization.
           </p>
         </div>
 
@@ -76,7 +81,7 @@ export default function EmailGate({ children }: { children: React.ReactNode }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-blue-200/70">
-              Enter your email to get started
+              Enter your email for free access
             </label>
             <input
               type="email"
@@ -102,7 +107,7 @@ export default function EmailGate({ children }: { children: React.ReactNode }) {
         {/* Trust/Privacy */}
         <div className="text-center space-y-2">
           <p className="text-blue-200/40 text-xs">
-            Your email is used for personalization and subscription management.
+            Your email unlocks generic explanations and all Lifelines. Personalization requires Premium.
             Permission to connect you with church leadership for care is controlled separately in your profile.
           </p>
           <div className="flex items-center justify-center gap-4 text-xs text-blue-200/30">

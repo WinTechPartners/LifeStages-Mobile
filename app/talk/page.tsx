@@ -1,6 +1,7 @@
 "use client"
 
 
+import { PremiumGate } from "@/components/premium-gate"
 import { apiFetch } from "@/lib/api-base"
 import { useState, useEffect, useRef, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -134,7 +135,7 @@ function TalkContent() {
     track('question_sent', { channel: 'chat', topicId, sermonId })
 
     try {
-      const response = await apiFetch("/api/voice-chat", {
+      const response = await apiFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -281,6 +282,7 @@ function TalkContent() {
             </div>
           )}
         </div>
+        <p className="text-xs text-blue-200">Voice Chat: Coming Soon — Premium Plus</p>
       </header>
 
       {/* Messages */}
@@ -397,7 +399,7 @@ function LoadingFallback() {
 export default function TalkPage() {
   return (
     <Suspense fallback={<LoadingFallback />}>
-      <ContentContextBoundary><TalkContent /></ContentContextBoundary>
+      <PremiumGate><ContentContextBoundary><TalkContent /></ContentContextBoundary></PremiumGate>
     </Suspense>
   )
 }

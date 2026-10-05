@@ -73,11 +73,11 @@ export default function LifelinesPage() {
             <div className="flex flex-wrap justify-center gap-3">
               <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
                 <span className="material-symbols-outlined text-cyan-400 text-lg">chat</span>
-                <span className="text-cyan-300 text-sm">Text Chat</span>
+                <span className="text-cyan-300 text-sm">Text Chat — Premium</span>
               </div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/30">
                 <span className="material-symbols-outlined text-green-400 text-lg">call</span>
-                <span className="text-green-300 text-sm">Voice Call</span>
+                <span className="text-green-300 text-sm">Voice — Coming Soon · Premium Plus</span>
               </div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
                 <span className="material-symbols-outlined text-amber-400 text-lg">highlight</span>
@@ -128,7 +128,7 @@ export default function LifelinesPage() {
                           type="button"
                           key={lifeline.id}
                           onClick={() => {
-                            if (!canAccessCore) { router.push("/subscription"); return }
+                            
                             track("lifeline_selected", { topicId: lifeline.id })
                             router.push(lifeLineUrl(lifeline))
                           }}

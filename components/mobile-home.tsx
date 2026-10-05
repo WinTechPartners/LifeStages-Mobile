@@ -1,12 +1,13 @@
 "use client"
+import { AppImage } from "@/components/app-image"
 
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { apiUrl } from "@/lib/api-base"
 import { useDevotional } from "@/context/devotional-context"
 import { useSubscription } from "@/context/subscription-context"
 import { useLanguage } from "@/context/language-context"
 import { useChurch } from "@/context/church-context"
+import { LanguageSelector } from "@/components/language-selector"
 import { HeaderDropdown } from "@/components/header-dropdown"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
 import { VOTDCarousel } from "@/components/votd-carousel"
@@ -65,7 +66,7 @@ export default function MobileHome() {
                   const profile = localStorage.getItem("userProfile")
                   const email = profile ? JSON.parse(profile).email : null
                   const platform = /android/i.test(navigator.userAgent) ? 'android' : 'ios'
-                  await fetch(apiUrl('/api/push/register'), {
+                  await fetch('/api/push/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ token, platform, email }),
@@ -161,7 +162,7 @@ export default function MobileHome() {
         <div className="flex min-w-0 items-center gap-3">
           {/* BLOCK 1: Logo */}
           {showChurchBranding && logo ? (
-            <img src={logo} alt="" className="h-9 max-w-20 object-contain" />
+            <AppImage src={logo} alt="" className="h-9 max-w-20 object-contain" />
           ) : showChurchBranding ? (
             <span className="material-symbols-outlined text-3xl">church</span>
           ) : (
@@ -179,7 +180,7 @@ export default function MobileHome() {
             <p className="text-[10px] opacity-70 font-medium tracking-wide">{showChurchBranding ? "POWERED BY LIFESTAGES" : "BIBLE FOR LIFE STAGES"}</p>
           </div>
         </div>
-        <HeaderDropdown verseReference={devotional.verse?.reference} />
+        <div className="flex items-center gap-1"><LanguageSelector /><HeaderDropdown verseReference={devotional.verse?.reference} /></div>
       </header>
 
       {/* Scrollable Content */}
@@ -371,8 +372,8 @@ export default function MobileHome() {
                     <span className="material-symbols-outlined text-amber-400 text-sm">star</span>
                     <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">Premium</span>
                   </div>
-                  <h3 className="text-xl font-bold text-white">Bring Scripture to Life</h3>
-                  <p className="text-sm text-blue-200/70 mt-1">AI-powered devotionals tailored to YOUR age, gender, and life stage</p>
+                  <h3 className="text-xl font-bold text-white">Premium Makes It Personal</h3>
+                  <p className="text-sm text-blue-200/70 mt-1">Free: Bible reading, verse of the day, and Friendly Breakdown. With email: explanations and all Lifelines. Premium personalizes content to your age, gender, and life stage.</p>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 mb-5">
@@ -396,7 +397,7 @@ export default function MobileHome() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-white font-bold">What You Get:</p>
-                      <p className="text-xs text-blue-200/60">Full access to all features</p>
+                      <p className="text-xs text-blue-200/60">Personalized breakdowns, Lifelines, all content, and Text Chat</p>
                     </div>
                     <div className="text-right">
                       <p className="text-2xl font-bold text-amber-400">$5<span className="text-sm text-blue-200/60">/mo</span></p>
@@ -409,7 +410,7 @@ export default function MobileHome() {
                   onClick={() => { hapticTap(); router.push("/subscription") }}
                   className="w-full py-4 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 text-gray-900 rounded-xl font-bold text-lg shadow-xl active:scale-[0.98] transition-transform animate-pulse hover:animate-none"
                 >
-                  Start Your FREE 7-Day Trial
+                  Try Personalization Free for 7 Days
                 </button>
                 <div className="flex items-center justify-center gap-4 mt-3">
                   <span className="flex items-center gap-1 text-xs text-green-400">
@@ -463,4 +464,3 @@ export default function MobileHome() {
     </div>
   )
 }
-

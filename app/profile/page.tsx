@@ -71,6 +71,7 @@ export default function ProfilePage() {
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) stored = parsed
     } catch { /* Replace an unreadable profile with the user's current selections. */ }
     localStorage.setItem("userProfile", JSON.stringify({ ...stored, ...updated }))
+    window.dispatchEvent(new Event('profile-updated'))
     window.dispatchEvent(new Event("lifestages-profile-changed"))
   }
 
@@ -80,6 +81,7 @@ export default function ProfilePage() {
 
   const handleLogout = () => {
     localStorage.removeItem("userProfile")
+    localStorage.removeItem("bible_user_email")
     window.dispatchEvent(new Event("lifestages-profile-changed"))
     localStorage.removeItem("selectedLanguage")
     // Clear any cached devotionals

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, type ReactNode, useCallback, useRef } from "react"
 import { useLanguage } from "./language-context"
+import { useSubscription } from "./subscription-context"
 import { apiUrl } from "@/lib/api-base"
 import { useChurch } from "./church-context"
 
@@ -119,6 +120,8 @@ const initialLoadingStates: LoadingStates = {
 }
 
 interface UserProfile {
+  email?: string | null
+  personalized?: boolean
   ageRange: string
   gender: string
   stageSituation: string
@@ -128,6 +131,7 @@ interface UserProfile {
 }
 
 export function DevotionalProvider({ children }: { children: ReactNode }) {
+  const { canAccessPremium, userEmail } = useSubscription()
   const [devotional, setDevotional] = useState<DevotionalData>({})
   const [isLoading, setIsLoading] = useState(false)
   const [loadingStep, setLoadingStep] = useState("")
@@ -148,9 +152,11 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
       if (savedProfile) {
         const parsed = JSON.parse(savedProfile)
         return {
-          ageRange: parsed.ageRange || "adult",
-          gender: parsed.gender || "male",
-          stageSituation: parsed.stageSituation || parsed.season || "General",
+          email: userEmail || parsed.email,
+          personalized: canAccessPremium,
+          ageRange: canAccessPremium ? parsed.ageRange || "adult" : "adult",
+          gender: canAccessPremium ? parsed.gender || "male" : "male",
+          stageSituation: canAccessPremium ? parsed.stageSituation || parsed.season || "General" : "General",
           language: selectedLanguage,
           contentStyle: parsed.contentStyle || "casual",
           churchId: church?.id || null,
@@ -167,7 +173,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
       contentStyle: "casual",
       churchId: church?.id || null,
     }
-  }, [selectedLanguage, church?.id])
+  }, [selectedLanguage, church?.id, canAccessPremium, userEmail])
 
   // Load username on mount
   React.useEffect(() => {
@@ -235,6 +241,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          email: profile.email,
           verse_reference: verse.reference,
           verse_text: verse.text,
           age_range: profile.ageRange,
@@ -277,6 +284,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
     premiumGeneratedRef.current = true
     
     const profilePayload = {
+      email: profile.email,
       verseReference: verse.reference,
       verseText: verse.text,
       ageRange: profile.ageRange,
@@ -481,7 +489,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
     }
     
     const profile = getFreshProfile()
-    const cacheKey = JSON.stringify([source, profile.churchId, profile.ageRange, profile.gender, profile.stageSituation, profile.language, profile.contentStyle])
+    const cacheKey = JSON.stringify(["access-v3", profile.personalized, "text-free-v3", source, profile.churchId, profile.ageRange, profile.gender, profile.stageSituation, profile.language, profile.contentStyle])
     
     // If we already loaded this exact combination, skip
     if (lastLoadedKeyRef.current === cacheKey && devotional.verse) {
@@ -548,7 +556,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
         lastLoadedKeyRef.current = cacheKey
         
         // Fire premium content in background (only once)
-        generatePremiumContentInBackground(verse, profile)
+        if (canAccessPremium) generatePremiumContentInBackground(verse, profile)
         
       } else {
         setLoadingStates(prev => ({ ...prev, interpretation: false }))
@@ -566,7 +574,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
     } finally {
       isLoadingRef.current = false
     }
-  }, [churchLoading, devotional.verse, generatePremiumContentInBackground, getDevotionalContent, getFreshProfile, getVerseFast])
+  }, [canAccessPremium, churchLoading, devotional.verse, generatePremiumContentInBackground, getDevotionalContent, getFreshProfile, getVerseFast])
 
   const generateForVerse = useCallback(async (verseQuery: string) => {
     lastLoadedKeyRef.current = null
@@ -581,16 +589,17 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Handle language changes
-  const prevLanguageRef = useRef(selectedLanguage)
+  const accessKey = `${selectedLanguage}:${canAccessPremium}:${userEmail || "anonymous"}`
+  const prevLanguageRef = useRef(accessKey)
   React.useEffect(() => {
-    if (prevLanguageRef.current === selectedLanguage) return
-    prevLanguageRef.current = selectedLanguage
+    if (prevLanguageRef.current === accessKey) return
+    prevLanguageRef.current = accessKey
     if (devotional.verse && !isLoading) {
       lastLoadedKeyRef.current = null
       premiumGeneratedRef.current = false
       generateDevotional(devotional.source || "YouVersion")
     }
-  }, [selectedLanguage, devotional.verse, devotional.source, isLoading, generateDevotional])
+  }, [accessKey, selectedLanguage, devotional.verse, devotional.source, isLoading, generateDevotional])
 
   return (
     <DevotionalContext.Provider

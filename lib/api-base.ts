@@ -24,5 +24,13 @@ export function apiUrl(path: string): string {
  * Drop-in replacement for fetch() for API calls.
  */
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(apiUrl(path), init)
+  let request = init
+  if (typeof window !== 'undefined' && typeof init?.body === 'string') {
+    try {
+      const body = JSON.parse(init.body)
+      const profile = JSON.parse(localStorage.getItem('userProfile') || '{}')
+      request = { ...init, body: JSON.stringify({ profile, ...body, email: profile.email || localStorage.getItem('bible_user_email') }) }
+    } catch { /* Non-JSON requests pass through. */ }
+  }
+  return fetch(apiUrl(path), request)
 }

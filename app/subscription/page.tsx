@@ -59,20 +59,25 @@ function SubscriptionContent() {
     { name: "Visual Imagery & Symbols", icon: "image", highlight: false },
     { name: "Worship Songs & Music", icon: "music_note", highlight: false },
     { name: "Biblical Context & Backstory", icon: "history_edu", highlight: false },
-    { name: "Life Situations & Guidance", icon: "explore", highlight: false },
-    { name: "Unlimited AI chat", icon: "chat", highlight: false },
-    { name: "AI that truly knows YOU", icon: "psychology", highlight: true },
+    { name: "Personalized Lifelines", icon: "explore", highlight: false },
+    { name: "Text Chat — Premium", icon: "chat", highlight: false },
+    { name: "Personalization across all content", icon: "psychology", highlight: true },
   ]
 
   const freeFeatures = [
-    { name: "Daily verse from YouVersion", included: true },
-    { name: "Basic friendly breakdown", included: true },
+    { name: "Read the entire Bible — no email", included: true },
+    { name: "Verse of the day — no email", included: true },
+    { name: "Generic Friendly Breakdown — no email", included: true },
+    { name: "Generic verse explanations — email only", included: true },
+    { name: "All generic Lifelines — email only", included: true },
     { name: "Personalized stories", included: false },
     { name: "Poetry & hymns", included: false },
     { name: "Visual imagery", included: false },
     { name: "Worship songs", included: false },
     { name: "Biblical context", included: false },
-    { name: "Life situations", included: false },
+    { name: "Personalization of Lifelines & all content", included: false },
+    { name: "Text Chat — Premium", included: false },
+    { name: "Voice Chat — Coming Soon, Premium Plus", included: false },
   ]
 
   const handleStartTrial = async () => {
@@ -162,14 +167,14 @@ function SubscriptionContent() {
         {/* Hero Section */}
         {tier === "free" && (
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-white mb-2">Transform Your Daily Devotion</h1>
-            <p className="text-blue-200/70">AI-powered scripture that speaks to YOUR life stage</p>
+            <h1 className="text-2xl font-bold text-white mb-2">Premium Brings Personalization</h1>
+            <p className="text-blue-200/70">The Bible, daily verse, and generic Friendly Breakdown are free without email. Email unlocks generic explanations and all Lifelines. Premium tailors breakdowns, Lifelines, stories, poetry, imagery, and context to YOUR profile.</p>
 
             {/* Free Trial Badge */}
             <div className="flex justify-center mt-4">
               <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-green-500/20 border border-green-500/30 text-green-400 text-sm font-semibold">
                 <span className="material-symbols-outlined !text-lg">check_circle</span>
-                7-Day Free Trial on All Plans
+                7-Day Trial of Premium Personalization
               </span>
             </div>
           </div>
