@@ -2,110 +2,18 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useSubscription } from "@/context/subscription-context"
+import { LIFELINE_CATEGORIES, LIFELINE_TOPICS, lifeLineUrl } from "@/lib/lifelines"
+import { track } from "@/lib/analytics/client"
 
 export default function LifelinesPage() {
   const router = useRouter()
+  const { canAccessCore } = useSubscription()
   const [expandedCategory, setExpandedCategory] = useState<string | null>("family")
 
-  const lifelineCategories = [
-    {
-      id: "family",
-      name: "Family & Relationships",
-      tagline: "The struggles of connection, conflict, and the breakdown of the home",
-      icon: "family_restroom",
-      color: "rose",
-      lifelines: [
-        { name: "Struggling with Family", icon: "home", desc: "General tension or estrangement" },
-        { name: "Impact of Divorce", icon: "link_off", desc: "Parental, personal, or late-stage/gray divorce" },
-        { name: "Relationship Conflicts", icon: "sync_problem", desc: "Friendship drama, dating, or marriage rifts" },
-        { name: "Wayward Loved Ones", icon: "directions_walk", desc: "The 'Prodigal' child, sibling, or spouse" },
-        { name: "Forgiving Someone", icon: "handshake", desc: "The internal battle of letting go" },
-        { name: "Difficulty Trusting Others", icon: "shield", desc: "Guardedness after betrayal" },
-      ]
-    },
-    {
-      id: "health",
-      name: "Health & Loss",
-      tagline: "The physical toll of life and the grief of what's been taken away",
-      icon: "healing",
-      color: "emerald",
-      lifelines: [
-        { name: "Physical Health Battles", icon: "local_hospital", desc: "New diagnosis or acute illness" },
-        { name: "Chronic Pain / Disability", icon: "accessible", desc: "Long-term physical limitations" },
-        { name: "Grieving a Loss", icon: "sentiment_sad", desc: "Death of a friend, spouse, or mentor" },
-        { name: "Infertility & Pregnancy Loss", icon: "child_friendly", desc: "Parental loss, teen pregnancy, or biological struggle" },
-        { name: "Special Needs & Autism", icon: "neurology", desc: "The unique weight of neurodiversity for the self or caregiver" },
-        { name: "Caring for Aging Parents", icon: "elderly", desc: "The 'Sandwich Generation' crisis" },
-      ]
-    },
-    {
-      id: "mental",
-      name: "Mental & Emotional",
-      tagline: "The internal climate of the mind and soul",
-      icon: "psychology",
-      color: "blue",
-      lifelines: [
-        { name: "Feeling Stressed", icon: "speed", desc: "The daily weight of 'too much'" },
-        { name: "Anxiety & Worry", icon: "sentiment_stressed", desc: "Fear of what is coming" },
-        { name: "Depression & Low Mood", icon: "cloud", desc: "The heaviness of 'not enough'" },
-        { name: "Burnout & Exhaustion", icon: "battery_0_bar", desc: "Running on empty" },
-        { name: "Anger & Frustration", icon: "mood_bad", desc: "Simmering resentment or outbursts" },
-        { name: "Feeling Invisible", icon: "visibility_off", desc: "A lack of recognition or value" },
-      ]
-    },
-    {
-      id: "work",
-      name: "Work & Finances",
-      tagline: "The pressure of provision, productivity, and future security",
-      icon: "work",
-      color: "amber",
-      lifelines: [
-        { name: "Financial Issues", icon: "money_off", desc: "Debt, fixed income, or scarcity" },
-        { name: "Workplace or School Tension", icon: "business", desc: "Conflict with bosses, teachers, or peers" },
-        { name: "Career or Academic Uncertainty", icon: "explore", desc: "Not knowing the next move" },
-        { name: "Making a Hard Decision", icon: "call_split", desc: "Ethics, crossroads, and big pivots" },
-      ]
-    },
-    {
-      id: "faith",
-      name: "Faith & Purpose",
-      tagline: "The vertical relationship with God and the search for 'Why?'",
-      icon: "church",
-      color: "purple",
-      lifelines: [
-        { name: "Continuing My Faith Journey", icon: "route", desc: "Seeking growth and next steps" },
-        { name: "Questioning My Beliefs", icon: "help", desc: "Doubt and deconstruction" },
-        { name: "Finding My Purpose", icon: "lightbulb", desc: "The 'What am I here for?' cry" },
-        { name: "Feeling Far from God", icon: "cloud_off", desc: "Spiritual dryness and silence" },
-        { name: "Unanswered Prayer", icon: "hourglass_empty", desc: "Wrestling with God's 'No' or 'Not yet'" },
-      ]
-    },
-    {
-      id: "identity",
-      name: "Self & Identity",
-      tagline: "The battle for how one sees themselves",
-      icon: "person",
-      color: "cyan",
-      lifelines: [
-        { name: "Doubting My Value", icon: "self_improvement", desc: "Low self-worth and identity crisis" },
-        { name: "Body Image Struggles", icon: "body_system", desc: "Comparing the physical self to others" },
-        { name: "Comparison & Envy", icon: "compare", desc: "The 'thief of joy' in a social media world" },
-        { name: "Dealing with Guilt & Shame", icon: "weight", desc: "The weight of past or present mistakes" },
-      ]
-    },
-    {
-      id: "trials",
-      name: "Trials & Temptation",
-      tagline: "The active fight against destructive patterns",
-      icon: "gpp_maybe",
-      color: "orange",
-      lifelines: [
-        { name: "Addiction Issues", icon: "psychology_alt", desc: "Substances, digital loops, or secret habits" },
-        { name: "Battling Temptation", icon: "shield", desc: "The moment-by-moment choice for integrity" },
-        { name: "Fear of the Future", icon: "schedule", desc: "Paralysis regarding the 'unknown'" },
-      ]
-    },
-  ]
+  const lifelineCategories = LIFELINE_CATEGORIES.map(category => ({
+    ...category, lifelines: LIFELINE_TOPICS.filter(topic => topic.category === category.id),
+  }))
 
   const colorClasses: Record<string, { bg: string; border: string; text: string; icon: string; gradient: string }> = {
     rose: { bg: "bg-rose-500/10", border: "border-rose-500/30", text: "text-rose-300", icon: "text-rose-400", gradient: "from-rose-500/20" },
@@ -216,20 +124,26 @@ export default function LifelinesPage() {
                   {isExpanded && (
                     <div className="p-5 bg-white/[0.02] grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {category.lifelines.map((lifeline) => (
-                        <div 
-                          key={lifeline.name}
-                          className={`rounded-xl p-4 ${colors.bg} border ${colors.border} hover:bg-white/10 transition-all cursor-pointer group`}
+                        <button
+                          type="button"
+                          key={lifeline.id}
+                          onClick={() => {
+                            if (!canAccessCore) { router.push("/subscription"); return }
+                            track("lifeline_selected", { topicId: lifeline.id })
+                            router.push(lifeLineUrl(lifeline))
+                          }}
+                          className={`rounded-xl p-4 ${colors.bg} border ${colors.border} hover:bg-white/10 transition-all cursor-pointer group text-left`}
                         >
                           <div className="flex items-start gap-3">
                             <span className={`material-symbols-outlined ${colors.icon} group-hover:scale-110 transition-transform`}>
                               {lifeline.icon}
                             </span>
                             <div>
-                              <h4 className="text-white font-semibold text-sm mb-1">{lifeline.name}</h4>
-                              <p className="text-xs text-blue-200/60 leading-relaxed">{lifeline.desc}</p>
+                              <h4 className="text-white font-semibold text-sm mb-1">{lifeline.label}</h4>
+                              <p className="text-xs text-blue-200/60 leading-relaxed">{lifeline.description}</p>
                             </div>
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}

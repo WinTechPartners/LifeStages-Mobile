@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation"
 import { useLanguage } from "@/context/language-context"
 import { LanguageSelector } from "@/components/language-selector"
 import { useSubscription } from "@/context/subscription-context"
+import { ChurchCarePreferences } from "@/components/church-care-preferences"
+import { AGE_BANDS, LEGACY_AGE_LABELS, isAgeBand, isPersonalizationAgeRange, toPersonalizationAgeRange } from "@/lib/age-bands"
 
 interface ProfileData {
   fullName: string
   email: string
   ageRange: string
+  ageBand: string
   gender: string
   stageSituation: string
   contentStyle: "casual" | "academic"
@@ -26,6 +29,7 @@ export default function ProfilePage() {
     fullName: "",
     email: "",
     ageRange: "",
+    ageBand: "",
     gender: "",
     stageSituation: "General",
     contentStyle: "casual",
@@ -36,13 +40,16 @@ export default function ProfilePage() {
 
   // Load from localStorage on mount
   useEffect(() => {
-    const savedData = localStorage.getItem("userProfile")
-    if (savedData) {
+    try {
+      const savedData = localStorage.getItem("userProfile")
+      if (!savedData) return
       const parsed = JSON.parse(savedData)
+      if (!parsed || typeof parsed !== "object") return
       setFormData({
         fullName: parsed.fullName || "",
         email: parsed.email || "",
-        ageRange: parsed.ageRange || "",
+        ageRange: toPersonalizationAgeRange(parsed) || "",
+        ageBand: isAgeBand(parsed.ageBand) ? parsed.ageBand : "",
         gender: parsed.gender || "",
         stageSituation: parsed.stageSituation || "General",
         contentStyle: parsed.contentStyle || "casual",
@@ -50,14 +57,21 @@ export default function ProfilePage() {
         country: parsed.country || "",
         bibleTranslation: parsed.bibleTranslation || "KJV",
       })
-    }
+    } catch { /* Keep the editable empty form if a local profile cannot be read. */ }
   }, [])
 
   // Save to localStorage whenever data changes
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: keyof ProfileData, value: string) => {
     const updated = { ...formData, [field]: value }
+    if (field === "ageBand") updated.ageRange = toPersonalizationAgeRange(updated) || ""
     setFormData(updated)
-    localStorage.setItem("userProfile", JSON.stringify(updated))
+    let stored: Record<string, unknown> = {}
+    try {
+      const parsed = JSON.parse(localStorage.getItem("userProfile") || "{}")
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) stored = parsed
+    } catch { /* Replace an unreadable profile with the user's current selections. */ }
+    localStorage.setItem("userProfile", JSON.stringify({ ...stored, ...updated }))
+    window.dispatchEvent(new Event("lifestages-profile-changed"))
   }
 
   const handleSave = () => {
@@ -66,19 +80,13 @@ export default function ProfilePage() {
 
   const handleLogout = () => {
     localStorage.removeItem("userProfile")
+    window.dispatchEvent(new Event("lifestages-profile-changed"))
     localStorage.removeItem("selectedLanguage")
     // Clear any cached devotionals
     const keys = Object.keys(localStorage).filter(k => k.startsWith("bible3_cache_"))
     keys.forEach(k => localStorage.removeItem(k))
     window.location.href = "/"
   }
-
-  const ageRanges = [
-    { value: "teens", label: "Teens (13-17)" },
-    { value: "university", label: "University (18-23)" },
-    { value: "adult", label: "Adult (24-64)" },
-    { value: "senior", label: "Senior (65+)" },
-  ]
 
   const genderOptions = [
     { value: "male", label: "Male", icon: "male" },
@@ -212,21 +220,23 @@ export default function ProfilePage() {
           </p>
         </label>
 
+          <ChurchCarePreferences />
+
         {/* Age Range */}
         <label className="flex flex-col gap-1.5 w-full">
-          <p className="text-sm font-medium leading-normal">{t("ageRange")}</p>
+          <p className="text-sm font-medium leading-normal">{t("ageRange")} <span className="text-muted-foreground font-normal">(optional)</span></p>
           <div className="relative">
             <select
-              value={formData.ageRange}
-              onChange={(e) => handleChange("ageRange", e.target.value)}
+              value={formData.ageBand}
+              onChange={(e) => handleChange("ageBand", e.target.value)}
               className="flex w-full resize-none overflow-hidden rounded-xl focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-border bg-card h-14 px-4 text-base font-normal leading-normal shadow-sm appearance-none transition-all"
             >
-              <option disabled value="">
-                Select your age range
+              <option value="">
+                {formData.ageRange ? "Keep my existing range" : "Select your age range (optional)"}
               </option>
-              {ageRanges.map((range) => (
-                <option key={range.value} value={range.value}>
-                  {range.label}
+              {AGE_BANDS.map((range) => (
+                <option key={range} value={range}>
+                  {range.replace("-", "–")}
                 </option>
               ))}
             </select>
@@ -234,6 +244,11 @@ export default function ProfilePage() {
               <span className="material-symbols-outlined">expand_more</span>
             </div>
           </div>
+          {!formData.ageBand && isPersonalizationAgeRange(formData.ageRange) && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Your saved range is {LEGACY_AGE_LABELS[formData.ageRange]}. You can keep it or choose a more specific range above.
+            </p>
+          )}
         </label>
 
         {/* Gender Selection */}

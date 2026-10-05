@@ -20,7 +20,7 @@ export default function PrivacyPage() {
       </div>
 
       <main className="flex-1 px-6 py-8 prose prose-sm max-w-none">
-        <p className="text-muted-foreground text-sm mb-6">Last updated: January 2025</p>
+        <p className="text-muted-foreground text-sm mb-6">Last updated: October 3, 2026</p>
 
         <h2 className="text-lg font-bold mt-6 mb-3">Overview</h2>
         <p>
@@ -35,27 +35,52 @@ export default function PrivacyPage() {
           When you set up your profile, you may provide:
         </p>
         <ul className="list-disc pl-5 space-y-1">
+          <li>Your email address</li>
           <li>Your name (optional)</li>
-          <li>Age range</li>
-          <li>Life situation/season</li>
-          <li>Content style preference</li>
+          <li>Age range (optional)</li>
+          <li>Gender (optional)</li>
+          <li>Self-reported country</li>
+          <li>Life situation/season and the &quot;Lifeline&quot; topics you choose (for example money, family, grief)</li>
+          <li>Church preference (optional)</li>
+          <li>Content style and Bible translation preference</li>
         </ul>
         <p>
-          This information is stored locally on your device and used to personalize your devotional content. 
-          It is not transmitted to our servers or shared with third parties.
+          Some of this is kept on your device to personalize your experience. Some of it is also
+          transmitted to our servers and to the service providers listed below so we can deliver
+          personalized content, process your subscription, send the daily verse email, and deliver
+          push notifications. Because life situation and church preference can reveal religious
+          beliefs, we treat this as sensitive information. Permission to connect you with church
+          leadership is a separate choice; using personalization does not grant that permission.
         </p>
 
-        <h3 className="text-base font-semibold mt-4 mb-2">Usage Data</h3>
+        <h3 className="text-base font-semibold mt-4 mb-2">Church Intelligence and Care</h3>
         <p>
-          We may collect anonymous usage statistics to improve the app, such as which features are most 
-          popular. This data cannot be used to identify you personally.
+          Church intelligence is intended to use anonymized aggregate patterns from LifeStages,
+          including topic sequences across the wider ecosystem. Anonymous reporting must protect
+          small groups and must not expose individual messages or identify a person to church leaders.
+          It does not establish attendance, a diagnosis, or a prediction about a particular person.
+          The production anonymous reporting connection is not enabled in this app version.
+        </p>
+        <p>
+          Permission to connect you with your selected church&apos;s leadership when there are
+          serious concerns about physical, spiritual, or mental safety is a separate choice in
+          Profile. That choice is saved on this device for that church. This version does not
+          implement automatic safety monitoring, alerts, referrals, or sharing your identity with
+          leadership. It is not an emergency response service.
+        </p>
+        <p>
+          A separate development pilot for minimized activity uses church-specific pseudonymous
+          identifiers. It is disabled in the normal app and is not represented as anonymous data.
+          Existing service requests and site performance analytics are separate from church reporting.
         </p>
 
         <h3 className="text-base font-semibold mt-4 mb-2">AI-Generated Content</h3>
         <p>
-          When you request devotional content, your profile preferences (age range, life situation) are 
-          sent to our AI service to generate personalized content. We do not store your conversations 
-          or generated content on our servers beyond what's needed to deliver the service.
+          When you request devotional content or chat with a verse, your profile details (which may
+          include your name, age range, gender, country, and life situation) and the messages you type
+          or speak are sent to our AI providers to generate a personalized response. Generated content
+          may be cached on our servers, keyed to age, gender, and life stage, to speed up the app and
+          reduce cost.
         </p>
 
         <h2 className="text-lg font-bold mt-6 mb-3">How We Use Your Information</h2>
@@ -68,16 +93,21 @@ export default function PrivacyPage() {
 
         <h2 className="text-lg font-bold mt-6 mb-3">Data Storage</h2>
         <p>
-          Your profile and preferences are stored locally on your device using browser storage. 
-          Cached devotional content is also stored locally to reduce loading times and API costs.
+          Your profile and preferences are stored on your device. Your email, subscription status,
+          push notification token, usage events, and cached devotional content are also stored on our
+          servers, which are hosted with our database provider listed below.
         </p>
 
         <h2 className="text-lg font-bold mt-6 mb-3">Third-Party Services</h2>
-        <p>We use the following third-party services:</p>
+        <p>We share data with the following service providers so the app can function:</p>
         <ul className="list-disc pl-5 space-y-1">
-          <li><strong>OpenRouter/Google AI</strong> - For generating personalized devotional content</li>
-          <li><strong>Bible.com (YouVersion)</strong> - For daily verse content</li>
-          <li><strong>Apple App Store / Google Play</strong> - For subscription processing</li>
+          <li><strong>OpenRouter</strong> (Anthropic Claude and Google Gemini models): generating personalized content and powering chat</li>
+          <li><strong>ElevenLabs</strong>: the optional voice conversation feature</li>
+          <li><strong>Supabase</strong>: our database and backend hosting</li>
+          <li><strong>Resend</strong>: sending the daily verse email</li>
+          <li><strong>RevenueCat, Apple App Store, and Google Play</strong>: in-app purchases and subscription management</li>
+          <li><strong>Apple Push Notification service and Google Firebase Cloud Messaging</strong>: delivering push notifications</li>
+          <li><strong>bolls.life and bible-api.com</strong>: providing Bible text (no personal data is sent to them)</li>
         </ul>
 
         <h2 className="text-lg font-bold mt-6 mb-3">Children's Privacy</h2>

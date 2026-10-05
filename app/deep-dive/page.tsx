@@ -1,21 +1,32 @@
 "use client"
 
 
-import { apiUrl } from "@/lib/api-base"
-import { useState, useEffect, Suspense } from "react"
+import { apiFetch } from "@/lib/api-base"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useDevotional } from "@/context/devotional-context"
 import { HeaderDropdown } from "@/components/header-dropdown"
+import { useChurch } from "@/context/church-context"
+import { useLanguage } from "@/context/language-context"
+import { contentCacheKey, optionalUuid } from "@/lib/content-context"
+import { isLifeLineId } from "@/lib/lifelines"
+import { track } from "@/lib/analytics/client"
+import { ContentContextBoundary } from "@/components/content-context-boundary"
 
 function DeepDiveContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { devotional } = useDevotional()
+  const { church, isLoading: churchLoading } = useChurch()
+  const { language } = useLanguage()
   
   // Check if we're in sermon mode
   const isSermonMode = searchParams.get('source') === 'sermon'
   const sermonTitle = searchParams.get('title') || ''
   const sermonSummary = searchParams.get('summary') || ''
+  const sermonId = isSermonMode ? optionalUuid(searchParams.get('sermonId')) : undefined
+  const selectedLifeLine = searchParams.get('lifelineId')
+  const topicId = isLifeLineId(selectedLifeLine) ? selectedLifeLine : undefined
   
   const topic = searchParams.get("topic") || (isSermonMode ? "Applying the Sermon" : "")
   const verseReference = isSermonMode ? sermonTitle : (devotional.verse?.reference || "")
@@ -24,7 +35,13 @@ function DeepDiveContent() {
   const [reflection, setReflection] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string>("")
-  const [hasStarted, setHasStarted] = useState(false)
+  const [reflectionContext, setReflectionContext] = useState('')
+  const requests = useRef(new Map<string, Promise<string>>())
+  const displayedContexts = useRef(new Set<string>())
+  const cacheKey = contentCacheKey('reflection', JSON.stringify([
+    isSermonMode ? 'sermon' : 'verse', sermonId || sermonTitle, topicId || topic,
+    verseReference, verseText,
+  ]), church?.id, language)
 
   // Get user profile for age
   const getAgeRange = () => {
@@ -40,44 +57,29 @@ function DeepDiveContent() {
 
   // Generate immediately when we have the content
   useEffect(() => {
-    if (hasStarted) return
-    
-    // For sermon mode, we don't need a topic
-    if (!isSermonMode && !topic) return
-    
-    // If no content, show error
+    if (churchLoading || (!isSermonMode && !topic)) return
+    let current = true
+    setReflection('')
+    setReflectionContext('')
+    setError('')
+    setIsLoading(true)
     if (!verseText) {
       setError("Please go back and try again")
       setIsLoading(false)
       return
     }
 
-    setHasStarted(true)
-    
-    const generateReflection = async () => {
+    const generateReflection = async (): Promise<string> => {
       const ageRange = getAgeRange()
-      
-      // Check cache first
-      const cacheKey = isSermonMode 
-        ? `bible3_sermon_lifeline_${sermonTitle}`.toLowerCase().replace(/[\s:]+/g, "_")
-        : `bible3_lifeline_${topic}_${verseReference}`.toLowerCase().replace(/[\s:]+/g, "_")
-      
-      const cached = localStorage.getItem(cacheKey)
-      if (cached) {
-        try {
-          const data = JSON.parse(cached)
-          if (data.reflection && data.reflection.length > 30) {
-            setReflection(data.reflection)
-            setIsLoading(false)
-            return
-          }
-        } catch (e) {
-          localStorage.removeItem(cacheKey)
-        }
-      }
-
       try {
-        const response = await fetch(apiUrl("/api/generate-deep-dive", {
+        const cached = localStorage.getItem(cacheKey)
+        if (cached) {
+          const data = JSON.parse(cached)
+          if (typeof data.reflection === 'string' && data.reflection.length > 30) return data.reflection
+        }
+      } catch { /* A damaged or unavailable cache must not block content. */ }
+
+        const response = await apiFetch("/api/generate-deep-dive", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -85,6 +87,10 @@ function DeepDiveContent() {
             verseReference: isSermonMode ? sermonTitle : verseReference,
             verseText: isSermonMode ? sermonSummary : verseText,
             ageRange,
+            language,
+            churchId: church?.id,
+            sermonId,
+            lifelineId: topicId,
             source: isSermonMode ? "sermon" : "verse",
             sermonTitle: isSermonMode ? sermonTitle : undefined,
             sermonSummary: isSermonMode ? sermonSummary : undefined,
@@ -94,20 +100,42 @@ function DeepDiveContent() {
         if (!response.ok) throw new Error("Failed to generate")
 
         const data = await response.json()
-        setReflection(data.reflection)
-        
-        // Cache it
-        localStorage.setItem(cacheKey, JSON.stringify({ reflection: data.reflection }))
-      } catch (err) {
-        console.error("Lifeline error:", err)
-        setError("Unable to generate. Please try again.")
-      } finally {
-        setIsLoading(false)
-      }
+        if (typeof data.reflection !== 'string' || !data.reflection.trim()) throw new Error('Empty reflection')
+        try { localStorage.setItem(cacheKey, JSON.stringify({ reflection: data.reflection })) } catch { /* optional cache */ }
+        return data.reflection
     }
 
-    generateReflection()
-  }, [topic, verseReference, verseText, hasStarted, isSermonMode, sermonTitle, sermonSummary])
+    // Reuse an in-flight request across effect replays for this exact context.
+    let request = requests.current.get(cacheKey)
+    if (!request) {
+      request = generateReflection()
+      requests.current.set(cacheKey, request)
+      request.catch(() => requests.current.delete(cacheKey))
+    }
+    request.then(value => {
+      if (!current) return
+      setReflection(value)
+      setReflectionContext(cacheKey)
+    }).catch(() => {
+      if (current) setError('Unable to generate. Please try again.')
+    }).finally(() => {
+      if (current) setIsLoading(false)
+    })
+    return () => { current = false }
+  }, [cacheKey, churchLoading, church?.id, language, topicId, sermonId, topic, verseReference, verseText, isSermonMode, sermonTitle, sermonSummary])
+
+  useEffect(() => {
+    if (isLoading || error || !reflection || reflectionContext !== cacheKey || displayedContexts.current.has(cacheKey)) return
+    displayedContexts.current.add(cacheKey)
+    track('content_displayed', { contentType: 'reflection', viewId: crypto.randomUUID(), topicId, sermonId })
+  }, [isLoading, error, reflection, reflectionContext, cacheKey, topicId, sermonId])
+
+  const talkParams = new URLSearchParams(isSermonMode
+    ? { context: 'sermon', title: sermonTitle, summary: sermonSummary }
+    : { deepDive: 'true', topic })
+  if (topicId) talkParams.set('lifelineId', topicId)
+  if (sermonId) talkParams.set('sermonId', sermonId)
+  if (isSermonMode && church?.id) talkParams.set('churchId', church.id)
 
   // Get icon for topic
   const getTopicIcon = (topicName: string): string => {
@@ -205,11 +233,7 @@ function DeepDiveContent() {
         {!isLoading && !error && (
           <div className="px-5 mt-6">
             <button
-              onClick={() => router.push(
-                isSermonMode 
-                  ? `/talk?context=sermon&title=${encodeURIComponent(sermonTitle)}`
-                  : `/talk?deepDive=true&topic=${encodeURIComponent(topic)}`
-              )}
+              onClick={() => router.push(`/talk?${talkParams}`)}
               className="w-full flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-xl font-semibold shadow-lg active:scale-[0.98] transition-transform"
             >
               <span className="material-symbols-outlined">forum</span>
@@ -229,7 +253,7 @@ export default function DeepDivePage() {
         <div className="size-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     }>
-      <DeepDiveContent />
+      <ContentContextBoundary><DeepDiveContent /></ContentContextBoundary>
     </Suspense>
   )
 }

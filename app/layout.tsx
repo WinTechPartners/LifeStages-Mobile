@@ -1,19 +1,8 @@
 import type React from "react"
+import { Suspense } from "react"
 import type { Metadata, Viewport } from "next"
-import { Libre_Baskerville, Inter } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
-import { DevotionalProvider } from "@/context/devotional-context"
-import { SubscriptionProvider } from "@/context/subscription-context"
-import { LanguageProvider } from "@/context/language-context"
-import { ChurchProvider } from "@/context/church-context"
-import EmailGate from "@/components/email-gate"
+import AppProviders from "@/components/app-providers"
 import "./globals.css"
-
-const _libreBaskerville = Libre_Baskerville({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-})
-const _inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "LifeStages | Bible for Life Stages",
@@ -56,17 +45,9 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans antialiased overscroll-none select-none">
-        <LanguageProvider>
-          <SubscriptionProvider>
-            <ChurchProvider>
-              <DevotionalProvider>
-                <EmailGate>{children}</EmailGate>
-              </DevotionalProvider>
-            </ChurchProvider>
-          </SubscriptionProvider>
-        </LanguageProvider>
-        <Analytics />
+        <Suspense fallback={<div className="min-h-screen bg-[#0c1929]" />}><AppProviders>{children}</AppProviders></Suspense>
       </body>
     </html>
   )
 }
+

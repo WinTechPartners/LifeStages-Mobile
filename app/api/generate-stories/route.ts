@@ -146,7 +146,7 @@ Requirements:
 - Characters that match the age range EXACTLY${languageInstruction}
 
 Be creative and original - surprise me with fresh scenarios!`,
-      maxTokens: 8000,
+      maxOutputTokens: 8000,
     })
 
     console.log("[v0] Raw LLM response (first 500 chars):", text.substring(0, 500))

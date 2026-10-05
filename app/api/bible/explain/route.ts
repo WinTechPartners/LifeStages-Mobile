@@ -61,7 +61,7 @@ STYLE:
 "${selectedText}"
 
 Give a friendly, plain-English explanation of what this means. Start with a brief paraphrase in modern language, then unpack the key idea. Make it practical and relatable.`,
-      maxTokens: 400,
+      maxOutputTokens: 400,
     })
 
     console.log("[Explain API] Generated text length:", text?.length)

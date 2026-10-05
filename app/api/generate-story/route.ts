@@ -66,7 +66,7 @@ STORY===
 IMAGE===
 [Cinematic scene from the story - specific moment, emotional, 25 words]
 ===IMAGE`,
-      maxTokens: 1800,
+      maxOutputTokens: 1800,
     })
 
     const titleMatch = text.match(/TITLE===\s*(.+?)\s*===TITLE/s)

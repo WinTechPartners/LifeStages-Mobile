@@ -12,12 +12,14 @@ const config: CapacitorConfig = {
   // API calls go to Vercel via NEXT_PUBLIC_API_BASE_URL in env
   
   plugins: {
+    CapacitorHttp: { enabled: true },
     SplashScreen: {
       launchShowDuration: 2500,
       launchAutoHide: true,
       backgroundColor: '#0c1929',
       showSpinner: true,
-      spinnerStyle: 'large',
+      androidSpinnerStyle: 'large',
+      iosSpinnerStyle: 'large',
       spinnerColor: '#f59e0b',
       splashFullScreen: true,
       splashImmersive: true,

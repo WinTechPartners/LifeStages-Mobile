@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:mobile": "BUILD_TARGET=mobile next build",
+    "build:mobile": "node scripts/build-mobile.mjs",
     "start": "next start",
     "lint": "eslint .",
     "cap:sync": "npx cap sync",
@@ -13,7 +13,10 @@
     "cap:android": "npx cap open android",
     "mobile": "npm run build:mobile && npx cap sync",
     "mobile:ios": "npm run mobile && npx cap open ios",
-    "mobile:android": "npm run mobile && npx cap open android"
+    "mobile:android": "npm run mobile && npx cap open android",
+    "test": "node --test tests/*.test.mjs",
+    "test:fixture": "node tests/browser-fixture.mjs",
+    "typecheck": "tsc --noEmit --incremental false"
   },
   "dependencies": {
     "@capacitor/core": "^6.2.0",

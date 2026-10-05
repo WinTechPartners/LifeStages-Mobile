@@ -102,7 +102,7 @@ AUDIO_PROMPT===
 IMAGE_PROMPT===
 [Album art: modern, Spotify-worthy, cinematic - 25 words]
 ===IMAGE_PROMPT`,
-      maxTokens: 1800,
+      maxOutputTokens: 1800,
     })
 
     // Strip markdown fences if the model wrapped its response

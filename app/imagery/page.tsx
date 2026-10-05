@@ -1,16 +1,23 @@
 "use client"
 
 
-import { apiUrl } from "@/lib/api-base"
+import { apiFetch } from "@/lib/api-base"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useDevotional } from "@/context/devotional-context"
 import { useEffect, useRef, useMemo, useState } from "react"
 import { HeaderDropdown } from "@/components/header-dropdown"
+import { useChurch } from "@/context/church-context"
+import { useLanguage } from "@/context/language-context"
+import { contentCacheKey, optionalUuid } from "@/lib/content-context"
+import { useContentDisplay } from "@/lib/use-content-display"
+import { ContentContextBoundary } from "@/components/content-context-boundary"
 
-export default function ImageryPage() {
+function ImageryContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { devotional } = useDevotional()
+  const { church } = useChurch()
+  const { language } = useLanguage()
   const mainRef = useRef<HTMLDivElement>(null)
   const [sermonImagery, setSermonImagery] = useState<any[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
@@ -19,8 +26,12 @@ export default function ImageryPage() {
   const isSermonMode = searchParams.get('source') === 'sermon'
   const sermonTitle = searchParams.get('title') || ''
   const sermonSummary = searchParams.get('summary') || ''
+  const sermonId = isSermonMode ? optionalUuid(searchParams.get('sermonId')) : undefined
+  const contentId = isSermonMode ? sermonId || JSON.stringify([sermonTitle, sermonSummary]) : devotional.verse?.reference || ''
+  const scopedCache = (kind: string) => contentCacheKey(kind, contentId, church?.id, language)
 
   const imagery = isSermonMode ? sermonImagery : (devotional.imagery || [])
+  useContentDisplay(imagery.some(item => !!item?.title || !!item?.img), scopedCache('imagery'), 'imagery', sermonId)
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -38,7 +49,7 @@ export default function ImageryPage() {
     setIsGenerating(true)
     try {
       // Check cache first
-      const cacheKey = `sermon_imagery_${sermonTitle}`.toLowerCase().replace(/[\s:]+/g, "_")
+      const cacheKey = scopedCache('sermon_imagery')
       const cached = localStorage.getItem(cacheKey)
       if (cached) {
         try {
@@ -53,13 +64,16 @@ export default function ImageryPage() {
         }
       }
 
-      const response = await fetch(apiUrl("/api/generate-imagery", {
+      const response = await apiFetch("/api/generate-imagery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           source: "sermon",
           sermonTitle,
           sermonSummary,
+          sermonId,
+          churchId: church?.id,
+          language,
         }),
       })
 
@@ -249,4 +263,8 @@ export default function ImageryPage() {
       </main>
     </div>
   )
+}
+
+export default function ImageryPage() {
+  return <ContentContextBoundary><ImageryContent /></ContentContextBoundary>
 }

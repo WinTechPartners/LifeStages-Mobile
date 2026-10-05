@@ -124,7 +124,7 @@ async function getVerseText(reference: string): Promise<{ reference: string; tex
       model: openrouter(modelId),
       system: "Return only the NIV Bible verse text. No commentary, no introduction, just the verse.",
       prompt: `What is the NIV text of ${reference}? Return ONLY the verse text, nothing else.`,
-      maxTokens: 300,
+      maxOutputTokens: 300,
     })
 
     return {
@@ -178,7 +178,7 @@ export async function POST(request: Request) {
           "version": "NIV",
           "text": "The exact NIV text of the verse"
         }`,
-        maxTokens: 500,
+        maxOutputTokens: 500,
       })
 
       const cleanJson = text.replace(/```json|```/g, "").trim()

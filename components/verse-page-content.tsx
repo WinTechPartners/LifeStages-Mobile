@@ -6,50 +6,10 @@ import { useDevotional } from "@/context/devotional-context"
 import { useSubscription } from "@/context/subscription-context"
 import { useChurch } from "@/context/church-context"
 import { HeaderDropdown } from "@/components/header-dropdown"
+import { LIFELINE_TOPICS, LIFELINE_CATEGORIES, lifeLineUrl } from "@/lib/lifelines"
+import { track } from "@/lib/analytics/client"
 
-const LIFELINE_TOPICS = [
-  // 1. Family & Relationships
-  { id: "struggling-with-family", label: "Struggling with Family", icon: "home", category: "family" },
-  { id: "impact-of-divorce", label: "Impact of Divorce", icon: "link_off", category: "family" },
-  { id: "relationship-conflicts", label: "Relationship Conflicts", icon: "sync_problem", category: "family" },
-  { id: "wayward-loved-ones", label: "Wayward Loved Ones", icon: "directions_walk", category: "family" },
-  { id: "forgiving-someone", label: "Forgiving Someone", icon: "handshake", category: "family" },
-  { id: "difficulty-trusting-others", label: "Difficulty Trusting Others", icon: "shield", category: "family" },
-  // 2. Health & Loss
-  { id: "physical-health-battles", label: "Physical Health Battles", icon: "local_hospital", category: "health" },
-  { id: "chronic-pain-disability", label: "Chronic Pain / Disability", icon: "accessible", category: "health" },
-  { id: "grieving-a-loss", label: "Grieving a Loss", icon: "sentiment_sad", category: "health" },
-  { id: "infertility-pregnancy-loss", label: "Infertility & Pregnancy Loss", icon: "child_friendly", category: "health" },
-  { id: "special-needs-autism", label: "Special Needs & Autism", icon: "neurology", category: "health" },
-  { id: "caring-for-aging-parents", label: "Caring for Aging Parents", icon: "elderly", category: "health" },
-  // 3. Mental & Emotional
-  { id: "feeling-stressed", label: "Feeling Stressed", icon: "speed", category: "mental" },
-  { id: "anxiety-worry", label: "Anxiety & Worry", icon: "sentiment_stressed", category: "mental" },
-  { id: "depression-low-mood", label: "Depression & Low Mood", icon: "cloud", category: "mental" },
-  { id: "burnout-exhaustion", label: "Burnout & Exhaustion", icon: "battery_0_bar", category: "mental" },
-  { id: "anger-frustration", label: "Anger & Frustration", icon: "mood_bad", category: "mental" },
-  { id: "feeling-invisible", label: "Feeling Invisible", icon: "visibility_off", category: "mental" },
-  // 4. Work & Finances
-  { id: "financial-issues", label: "Financial Issues", icon: "money_off", category: "work" },
-  { id: "workplace-school-tension", label: "Workplace or School Tension", icon: "business", category: "work" },
-  { id: "career-academic-uncertainty", label: "Career or Academic Uncertainty", icon: "explore", category: "work" },
-  { id: "making-hard-decision", label: "Making a Hard Decision", icon: "call_split", category: "work" },
-  // 5. Faith & Purpose
-  { id: "continuing-faith-journey", label: "Continuing My Faith Journey", icon: "route", category: "faith" },
-  { id: "questioning-beliefs", label: "Questioning My Beliefs", icon: "help", category: "faith" },
-  { id: "finding-purpose", label: "Finding My Purpose", icon: "lightbulb", category: "faith" },
-  { id: "feeling-far-from-god", label: "Feeling Far from God", icon: "cloud_off", category: "faith" },
-  { id: "unanswered-prayer", label: "Unanswered Prayer", icon: "hourglass_empty", category: "faith" },
-  // 6. Self & Identity
-  { id: "doubting-my-value", label: "Doubting My Value", icon: "self_improvement", category: "identity" },
-  { id: "body-image-struggles", label: "Body Image Struggles", icon: "body_system", category: "identity" },
-  { id: "comparison-envy", label: "Comparison & Envy", icon: "compare", category: "identity" },
-  { id: "guilt-shame", label: "Dealing with Guilt & Shame", icon: "weight", category: "identity" },
-  // 7. Trials & Temptation
-  { id: "addiction-issues", label: "Addiction Issues", icon: "psychology_alt", category: "trials" },
-  { id: "battling-temptation", label: "Battling Temptation", icon: "shield", category: "trials" },
-  { id: "fear-of-future", label: "Fear of the Future", icon: "schedule", category: "trials" },
-]
+
 
 export default function VersePageContent() {
   const router = useRouter()
@@ -71,11 +31,12 @@ export default function VersePageContent() {
     const topic = LIFELINE_TOPICS.find(t => t.id === topicId)
     if (topic) {
       setShowLifelinesModal(false)
-      router.push(`/deep-dive?topic=${encodeURIComponent(topic.label)}`)
+      track("lifeline_selected", { topicId: topic.id })
+      router.push(lifeLineUrl(topic))
     }
   }
 
-  const lifelinesLimitText = tier === "free" ? "Upgrade for access" : tier === "core" ? "1/day" : "5/day"
+  const lifelinesLimitText = tier === "free" ? "Upgrade for access" : "5/day"
   const showChurchBranding = hasChurch && !churchLoading
 
   return (
@@ -121,15 +82,7 @@ export default function VersePageContent() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {[
-                    { cat: "family", title: "Family & Relationships", color: "rose" },
-                    { cat: "health", title: "Health & Loss", color: "emerald" },
-                    { cat: "mental", title: "Mental & Emotional", color: "blue" },
-                    { cat: "work", title: "Work & Finances", color: "amber" },
-                    { cat: "faith", title: "Faith & Purpose", color: "purple" },
-                    { cat: "identity", title: "Self & Identity", color: "cyan" },
-                    { cat: "trials", title: "Trials & Temptation", color: "orange" },
-                  ].map(({ cat, title, color }) => (
+                  {LIFELINE_CATEGORIES.map(({ id: cat, name: title, color }) => (
                     <div key={cat}>
                       <h4 className={`text-xs font-bold text-${color}-400 uppercase tracking-wider mb-3`}>{title}</h4>
                       <div className="grid grid-cols-2 gap-2">

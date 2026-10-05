@@ -1,11 +1,17 @@
 "use client"
 
 
-import { apiUrl } from "@/lib/api-base"
+import { apiFetch } from "@/lib/api-base"
 import { useState, useEffect, useRef, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useDevotional } from "@/context/devotional-context"
 import { HeaderDropdown } from "@/components/header-dropdown"
+import { useChurch } from "@/context/church-context"
+import { useLanguage } from "@/context/language-context"
+import { contentCacheKey, optionalUuid } from "@/lib/content-context"
+import { isLifeLineId } from "@/lib/lifelines"
+import { track } from "@/lib/analytics/client"
+import { ContentContextBoundary } from "@/components/content-context-boundary"
 
 interface Message {
   id: number
@@ -24,19 +30,32 @@ function TalkContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { devotional } = useDevotional()
+  const { church, isLoading: churchLoading } = useChurch()
+  const { language } = useLanguage()
   
-  const verseReference = devotional.verse?.reference || "General"
-  const verseText = devotional.verse?.text || ""
+  const isSermonMode = searchParams.get('context') === 'sermon'
+  const sermonTitle = searchParams.get('title') || ''
+  const sermonSummary = searchParams.get('summary') || ''
+  const sermonId = isSermonMode ? optionalUuid(searchParams.get('sermonId')) : undefined
+  const verseReference = isSermonMode ? sermonTitle : devotional.verse?.reference || "General"
+  const verseText = isSermonMode ? sermonSummary : devotional.verse?.text || ""
   
   // Check if this is a Deep Dive conversation
   const isDeepDive = searchParams.get("deepDive") === "true"
   const deepDiveTopic = searchParams.get("topic") || ""
+  const selectedLifeLine = searchParams.get('lifelineId')
+  const topicId = isLifeLineId(selectedLifeLine) ? selectedLifeLine : undefined
+  const storageKey = contentCacheKey('chat', JSON.stringify([
+    isSermonMode ? 'sermon' : 'verse', sermonId || verseReference, topicId || deepDiveTopic,
+  ]), church?.id, language)
 
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState("")
   const [isTyping, setIsTyping] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [loadedHistoryKey, setLoadedHistoryKey] = useState<string | null>(null)
+  const requestInFlight = useRef(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -54,6 +73,9 @@ function TalkContent() {
   const getInitialMessage = useCallback(() => {
     const name = userProfile?.fullName?.split(" ")[0] || ""
     const greeting = name ? `Hey ${name}!` : "Hey!"
+    if (isSermonMode) {
+      return { id: 1, sender: 'Study Buddy', text: `${greeting} We're reflecting on "${sermonTitle}." What stood out to you, or what would you like to talk through?` }
+    }
     
     if (isDeepDive && deepDiveTopic) {
       return {
@@ -68,30 +90,26 @@ function TalkContent() {
       sender: "Study Buddy",
       text: `${greeting} So we're looking at ${verseReference} today. I'd love to hear what stands out to you - what's on your mind about this verse?`,
     }
-  }, [userProfile, isDeepDive, deepDiveTopic, verseReference])
+  }, [userProfile, isDeepDive, deepDiveTopic, verseReference, isSermonMode, sermonTitle])
 
   // Load chat history
   useEffect(() => {
-    const storageKey = isDeepDive 
-      ? `chatHistory_deepDive_${deepDiveTopic}_${verseReference}`
-      : `chatHistory_${verseReference}`
-    const savedMessages = localStorage.getItem(storageKey)
-    if (savedMessages) {
-      setMessages(JSON.parse(savedMessages))
-    } else {
-      setMessages([getInitialMessage()])
-    }
-  }, [verseReference, isDeepDive, deepDiveTopic, getInitialMessage])
+    if (churchLoading) return
+    let history: Message[] = [getInitialMessage()]
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || 'null')
+      if (Array.isArray(saved) && saved.every(m => typeof m.text === 'string' && typeof m.sender === 'string')) history = saved
+    } catch { /* Ignore damaged or unavailable local history. */ }
+    setMessages(history)
+    setLoadedHistoryKey(storageKey)
+  }, [storageKey, churchLoading, getInitialMessage])
 
   // Save chat history
   useEffect(() => {
-    const storageKey = isDeepDive 
-      ? `chatHistory_deepDive_${deepDiveTopic}_${verseReference}`
-      : `chatHistory_${verseReference}`
-    if (messages.length > 0) {
-      localStorage.setItem(storageKey, JSON.stringify(messages))
+    if (!churchLoading && loadedHistoryKey === storageKey && messages.length > 0) {
+      try { localStorage.setItem(storageKey, JSON.stringify(messages)) } catch { /* optional local history */ }
     }
-  }, [messages, verseReference, isDeepDive, deepDiveTopic])
+  }, [messages, storageKey, loadedHistoryKey, churchLoading])
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -100,7 +118,8 @@ function TalkContent() {
 
   // Send message
   const handleSendMessage = async () => {
-    if (!inputValue.trim()) return
+    if (!inputValue.trim() || requestInFlight.current || churchLoading) return
+    requestInFlight.current = true
 
     const newUserMsg: Message = {
       id: Date.now(),
@@ -111,9 +130,11 @@ function TalkContent() {
     setMessages((prev) => [...prev, newUserMsg])
     setInputValue("")
     setIsTyping(true)
+    // This is the selected LifeLine context, never a classification of the private message.
+    track('question_sent', { channel: 'chat', topicId, sermonId })
 
     try {
-      const response = await fetch(apiUrl("/api/voice-chat", {
+      const response = await apiFetch("/api/voice-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -124,6 +145,9 @@ function TalkContent() {
           userProfile,
           isDeepDive,
           deepDiveTopic,
+          sermonId,
+          source: isSermonMode ? 'sermon' : 'verse',
+          lifelineId: topicId,
         }),
       })
 
@@ -146,15 +170,13 @@ function TalkContent() {
       }
       setMessages((prev) => [...prev, errorMsg])
     } finally {
+      requestInFlight.current = false
       setIsTyping(false)
     }
   }
 
   const clearHistory = () => {
-    const storageKey = isDeepDive 
-      ? `chatHistory_deepDive_${deepDiveTopic}_${verseReference}`
-      : `chatHistory_${verseReference}`
-    localStorage.removeItem(storageKey)
+    try { localStorage.removeItem(storageKey) } catch { /* optional local history */ }
     setMessages([getInitialMessage()])
     setDropdownOpen(false)
   }
@@ -375,7 +397,7 @@ function LoadingFallback() {
 export default function TalkPage() {
   return (
     <Suspense fallback={<LoadingFallback />}>
-      <TalkContent />
+      <ContentContextBoundary><TalkContent /></ContentContextBoundary>
     </Suspense>
   )
 }

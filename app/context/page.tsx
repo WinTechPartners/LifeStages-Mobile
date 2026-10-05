@@ -1,16 +1,23 @@
 "use client"
 
 
-import { apiUrl } from "@/lib/api-base"
+import { apiFetch } from "@/lib/api-base"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useDevotional } from "@/context/devotional-context"
 import { useEffect, useRef, useState } from "react"
 import { HeaderDropdown } from "@/components/header-dropdown"
+import { useChurch } from "@/context/church-context"
+import { useLanguage } from "@/context/language-context"
+import { contentCacheKey, optionalUuid } from "@/lib/content-context"
+import { useContentDisplay } from "@/lib/use-content-display"
+import { ContentContextBoundary } from "@/components/content-context-boundary"
 
-export default function ContextPage() {
+function ContextContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { devotional } = useDevotional()
+  const { church } = useChurch()
+  const { language } = useLanguage()
   const mainRef = useRef<HTMLDivElement>(null)
   const [openSection, setOpenSection] = useState<number | null>(0)
   const [sermonContext, setSermonContext] = useState<any>(null)
@@ -20,6 +27,9 @@ export default function ContextPage() {
   const isSermonMode = searchParams.get('source') === 'sermon'
   const sermonTitle = searchParams.get('title') || ''
   const sermonSummary = searchParams.get('summary') || ''
+  const sermonId = isSermonMode ? optionalUuid(searchParams.get('sermonId')) : undefined
+  const contentId = isSermonMode ? sermonId || JSON.stringify([sermonTitle, sermonSummary]) : devotional.verse?.reference || ''
+  const scopedCache = (kind: string) => contentCacheKey(kind, contentId, church?.id, language)
 
   const context = isSermonMode ? sermonContext : (devotional.context || {})
   const sourceReference = isSermonMode ? sermonTitle : devotional.verse?.reference
@@ -40,7 +50,7 @@ export default function ContextPage() {
     setIsGenerating(true)
     try {
       // Check cache first
-      const cacheKey = `sermon_context_${sermonTitle}`.toLowerCase().replace(/[\s:]+/g, "_")
+      const cacheKey = scopedCache('sermon_context')
       const cached = localStorage.getItem(cacheKey)
       if (cached) {
         try {
@@ -55,13 +65,16 @@ export default function ContextPage() {
         }
       }
 
-      const response = await fetch(apiUrl("/api/generate-context", {
+      const response = await apiFetch("/api/generate-context", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           source: "sermon",
           sermonTitle,
           sermonSummary,
+          sermonId,
+          churchId: church?.id,
+          language,
         }),
       })
 
@@ -101,6 +114,7 @@ export default function ContextPage() {
   ]
 
   const hasContent = isSermonMode ? !!sermonContext : !!context.whoIsSpeaking
+  useContentDisplay(isSermonMode ? !!sermonContext && Object.keys(sermonContext).length > 0 : !!context.whoIsSpeaking, scopedCache('context'), 'context', sermonId)
 
   return (
     <div
@@ -198,4 +212,8 @@ export default function ContextPage() {
       </main>
     </div>
   )
+}
+
+export default function ContextPage() {
+  return <ContentContextBoundary><ContextContent /></ContentContextBoundary>
 }

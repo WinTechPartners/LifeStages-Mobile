@@ -1,16 +1,23 @@
 "use client"
 
 
-import { apiUrl } from "@/lib/api-base"
+import { apiFetch } from "@/lib/api-base"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useDevotional } from "@/context/devotional-context"
 import { useEffect, useRef, useState } from "react"
 import { HeaderDropdown } from "@/components/header-dropdown"
+import { useChurch } from "@/context/church-context"
+import { useLanguage } from "@/context/language-context"
+import { contentCacheKey, optionalUuid } from "@/lib/content-context"
+import { useContentDisplay } from "@/lib/use-content-display"
+import { ContentContextBoundary } from "@/components/content-context-boundary"
 
-export default function StoriesPage() {
+function StoriesContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { devotional } = useDevotional()
+  const { church } = useChurch()
+  const { language } = useLanguage()
   const mainRef = useRef<HTMLDivElement>(null)
   const [storyType, setStoryType] = useState<"true" | "illustrated">("true")
   const [activeTab, setActiveTab] = useState(0)
@@ -23,6 +30,9 @@ export default function StoriesPage() {
   const isSermonMode = searchParams.get('source') === 'sermon'
   const sermonTitle = searchParams.get('title') || ''
   const sermonSummary = searchParams.get('summary') || ''
+  const sermonId = isSermonMode ? optionalUuid(searchParams.get('sermonId')) : undefined
+  const contentId = isSermonMode ? sermonId || JSON.stringify([sermonTitle, sermonSummary]) : devotional.verse?.reference || ''
+  const scopedCache = (kind: string) => contentCacheKey(kind, contentId, church?.id, language)
 
   // Use appropriate stories based on type and mode
   const illustratedStories = isSermonMode ? sermonStories : (devotional.stories || [])
@@ -57,7 +67,7 @@ export default function StoriesPage() {
     try {
       // Check cache first
       const searchTerm = isSermonMode ? sermonTitle : (devotional.verse?.reference || "faith")
-      const cacheKey = `true_stories_${searchTerm}`.toLowerCase().replace(/[\s:]+/g, "_")
+      const cacheKey = scopedCache('true_stories')
       const cached = localStorage.getItem(cacheKey)
       if (cached) {
         try {
@@ -72,7 +82,7 @@ export default function StoriesPage() {
         }
       }
 
-      const response = await fetch(apiUrl("/api/search-true-stories", {
+      const response = await apiFetch("/api/search-true-stories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -96,7 +106,7 @@ export default function StoriesPage() {
   const generateSermonStories = async () => {
     setIsGenerating(true)
     try {
-      const cacheKey = `sermon_stories_${sermonTitle}`.toLowerCase().replace(/[\s:]+/g, "_")
+      const cacheKey = scopedCache('sermon_stories')
       const cached = localStorage.getItem(cacheKey)
       if (cached) {
         try {
@@ -114,15 +124,18 @@ export default function StoriesPage() {
       const savedProfile = localStorage.getItem("userProfile")
       const profile = savedProfile ? JSON.parse(savedProfile) : {}
 
-      const response = await fetch(apiUrl("/api/generate-stories", {
+      const response = await apiFetch("/api/generate-stories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           source: "sermon",
           sermonTitle,
           sermonSummary,
-          ageRange: profile.age || "adult",
-          stageSituation: profile.lifeStage || "navigating daily life",
+          sermonId,
+          churchId: church?.id,
+          language,
+          ageRange: profile.ageRange || profile.age || "adult",
+          stageSituation: profile.stageSituation || profile.lifeStage || "navigating daily life",
         }),
       })
 
@@ -139,6 +152,7 @@ export default function StoriesPage() {
   }
 
   const activeStory = stories[activeTab]
+  useContentDisplay(storyType === 'true' ? !isSearching && trueStories.some(story => !!story?.title) : !!activeStory?.text, scopedCache('stories_' + storyType), 'stories', sermonId)
   const illustratedTabLabels = ["Today's World", "Different Time"]
 
   return (
@@ -318,4 +332,8 @@ export default function StoriesPage() {
       </main>
     </div>
   )
+}
+
+export default function StoriesPage() {
+  return <ContentContextBoundary><StoriesContent /></ContentContextBoundary>
 }

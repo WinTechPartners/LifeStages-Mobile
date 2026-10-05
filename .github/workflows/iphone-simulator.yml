@@ -1,0 +1,58 @@
+name: LifeStages iPhone simulator
+on:
+  push:
+    branches: [codex/lifestages-appetize-simulator]
+    paths-ignore: ['docs/**', 'README.md']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: lifestages-iphone-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  simulator:
+    runs-on: macos-14
+    timeout-minutes: 35
+    env:
+      NEXT_PUBLIC_API_BASE_URL: https://www.bibleforlifestages.com
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --legacy-peer-deps
+      - name: Check TypeScript
+        run: npm run typecheck
+      - name: Build bundled mobile interface
+        run: npm run build:mobile
+      - name: Create and sync the native iOS project
+        run: |
+          npx cap add ios
+          npx cap sync ios
+      - name: Set simulator privacy descriptions
+        run: |
+          /usr/libexec/PlistBuddy -c 'Add :NSMicrophoneUsageDescription string LifeStages uses your microphone when you choose voice chat.' ios/App/App/Info.plist
+      - name: Compile unsigned simulator app
+        run: |
+          xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios-simulator ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+          test -f build/ios-simulator/Build/Products/Release-iphonesimulator/App.app/Info.plist
+          ditto -c -k --sequesterRsrc --keepParent build/ios-simulator/Build/Products/Release-iphonesimulator/App.app LifeStages-iPhone-Simulator.app.zip
+      - name: Upload Appetize-ready simulator build
+        uses: actions/upload-artifact@v4
+        with:
+          name: LifeStages-iPhone-Simulator
+          path: LifeStages-iPhone-Simulator.app.zip
+          retention-days: 14
+      - name: Upload the bundled native project for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: LifeStages-iOS-Project
+          path: |
+            ios/App/App/**
+            ios/App/App.xcodeproj/**
+            ios/App/Podfile
+            ios/App/Podfile.lock
+          retention-days: 14

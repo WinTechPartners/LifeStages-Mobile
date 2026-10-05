@@ -1,16 +1,23 @@
 "use client"
 
 
-import { apiUrl } from "@/lib/api-base"
+import { apiFetch } from "@/lib/api-base"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useDevotional } from "@/context/devotional-context"
 import { useEffect, useRef, useState } from "react"
 import { HeaderDropdown } from "@/components/header-dropdown"
+import { useChurch } from "@/context/church-context"
+import { useLanguage } from "@/context/language-context"
+import { contentCacheKey, optionalUuid } from "@/lib/content-context"
+import { useContentDisplay } from "@/lib/use-content-display"
+import { ContentContextBoundary } from "@/components/content-context-boundary"
 
-export default function PoetryPage() {
+function PoetryContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { devotional } = useDevotional()
+  const { church } = useChurch()
+  const { language } = useLanguage()
   const mainRef = useRef<HTMLDivElement>(null)
   const [activeTab, setActiveTab] = useState<"classic" | "freeverse">("classic")
   const [sermonPoems, setSermonPoems] = useState<any[]>([])
@@ -20,6 +27,9 @@ export default function PoetryPage() {
   const isSermonMode = searchParams.get('source') === 'sermon'
   const sermonTitle = searchParams.get('title') || ''
   const sermonSummary = searchParams.get('summary') || ''
+  const sermonId = isSermonMode ? optionalUuid(searchParams.get('sermonId')) : undefined
+  const contentId = isSermonMode ? sermonId || JSON.stringify([sermonTitle, sermonSummary]) : devotional.verse?.reference || ''
+  const scopedCache = (kind: string) => contentCacheKey(kind, contentId, church?.id, language)
 
   // Use sermon poems if in sermon mode, otherwise use devotional poems
   const poems = isSermonMode ? sermonPoems : (devotional.poetry || [])
@@ -41,7 +51,7 @@ export default function PoetryPage() {
     setIsGenerating(true)
     try {
       // Check cache first
-      const cacheKey = `sermon_poetry_${sermonTitle}`.toLowerCase().replace(/[\s:]+/g, "_")
+      const cacheKey = scopedCache('sermon_poetry')
       const cached = localStorage.getItem(cacheKey)
       if (cached) {
         try {
@@ -59,15 +69,18 @@ export default function PoetryPage() {
       const savedProfile = localStorage.getItem("userProfile")
       const profile = savedProfile ? JSON.parse(savedProfile) : {}
 
-      const response = await fetch(apiUrl("/api/generate-poetry", {
+      const response = await apiFetch("/api/generate-poetry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           source: "sermon",
           sermonTitle,
           sermonSummary,
-          ageRange: profile.age || "adult",
-          stageSituation: profile.lifeStage || "navigating daily life",
+          sermonId,
+          churchId: church?.id,
+          language,
+          ageRange: profile.ageRange || profile.age || "adult",
+          stageSituation: profile.stageSituation || profile.lifeStage || "navigating daily life",
         }),
       })
 
@@ -85,6 +98,7 @@ export default function PoetryPage() {
   }
 
   const activePoem = activeTab === "classic" ? poems[0] : poems[1]
+  useContentDisplay(!!activePoem?.text, scopedCache('poetry'), 'poetry', sermonId)
 
   return (
     <div
@@ -197,4 +211,8 @@ export default function PoetryPage() {
       </main>
     </div>
   )
+}
+
+export default function PoetryPage() {
+  return <ContentContextBoundary><PoetryContent /></ContentContextBoundary>
 }

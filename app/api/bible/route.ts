@@ -148,7 +148,16 @@ export async function GET(request: Request) {
       // bolls.life returns array: [{ verse: 1, text: "..." }, ...]
       const verses = (data || []).map((v: { verse: number; text: string }) => ({
         number: v.verse,
-        text: (v.text || "").replace(/<[^>]*>/g, '').trim() // Strip HTML tags
+        text: (v.text || "")
+          .replace(/<S>.*?<\/S>/gi, '')       // Remove Strong's number tags AND their numbers (any length)
+          .replace(/<sup>.*?<\/sup>/gi, '')   // Remove footnote / translator-note superscripts
+          .replace(/<br\s*\/?>/gi, '\n')      // Convert line breaks (headings & poetry) to real newlines
+          .replace(/<[^>]*>/g, '')            // Strip any remaining tags (i, b, etc.), keep inner text
+          .replace(/[ \t]+([,.;:!?])/g, '$1') // Remove stray space left before punctuation
+          .replace(/[ \t]{2,}/g, ' ')         // Collapse runs of spaces (preserve newlines)
+          .replace(/[ \t]*\n[ \t]*/g, '\n')   // Trim spaces around newlines
+          .replace(/\n{2,}/g, '\n')           // Collapse blank lines
+          .trim()
       }))
 
       return Response.json({

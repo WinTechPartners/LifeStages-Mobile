@@ -8,12 +8,9 @@ import { MessageInput } from "./message-input"
 import { ChatHeader } from "./chat-header"
 import { WelcomeScreen } from "./welcome-screen"
 import { apiUrl } from "@/lib/api-base"
+import { track } from "@/lib/analytics/client"
 
-type Message = {
-  id: string
-  role: "user" | "assistant"
-  content: string
-}
+import type { ChatMessage as Message } from "@/types/chat-message"
 
 export function BibleChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -33,7 +30,7 @@ export function BibleChat() {
     setMessages([])
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value)
   }
 
@@ -58,61 +55,21 @@ export function BibleChat() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          messages: [...messages, userMessage].map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
+          message: userMessage.content,
+          verseReference: 'General Bible study',
+          verseText: '',
+          history: messages.slice(-6).map((m) => ({ sender: m.role, text: m.content })),
         }),
       })
 
       if (!response.ok) {
         throw new Error("Failed to get response")
       }
+      track("question_sent", { channel: "chat" })
 
-      const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
-      let assistantMessage = ""
-
-      const assistantId = (Date.now() + 1).toString()
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          const chunk = decoder.decode(value)
-          const lines = chunk.split("\n")
-
-          for (const line of lines) {
-            if (line.startsWith("0:")) {
-              try {
-                const jsonStr = line.substring(2)
-                const parsed = JSON.parse(jsonStr)
-                if (parsed) {
-                  assistantMessage += parsed
-                  setMessages((prev) => {
-                    const existing = prev.find((m) => m.id === assistantId)
-                    if (existing) {
-                      return prev.map((m) => (m.id === assistantId ? { ...m, content: assistantMessage } : m))
-                    } else {
-                      return [
-                        ...prev,
-                        {
-                          id: assistantId,
-                          role: "assistant" as const,
-                          content: assistantMessage,
-                        },
-                      ]
-                    }
-                  })
-                }
-              } catch (e) {
-                // Skip invalid JSON
-              }
-            }
-          }
-        }
-      }
+      const result = await response.json()
+      if (typeof result.response !== 'string' || !result.response.trim()) throw new Error('No usable reply')
+      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: result.response }])
     } catch (error) {
       console.error("Chat error:", error)
       setMessages((prev) => [

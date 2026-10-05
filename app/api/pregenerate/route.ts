@@ -96,7 +96,7 @@ Return ONLY valid JSON in this exact format (no markdown, no code blocks):
   const { text } = await generateText({
     model: openrouter(MODEL_ID),
     prompt,
-    maxTokens: 2500,
+    maxOutputTokens: 2500,
   })
 
   const cleanJson = text.replace(/```json|```/g, '').trim()

@@ -1,8 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { usePathname } from "next/navigation"
 
 export default function EmailGate({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
   const [email, setEmail] = useState("")
   const [hasEmail, setHasEmail] = useState<boolean | null>(null) // null = loading
   const [error, setError] = useState("")
@@ -37,6 +39,9 @@ export default function EmailGate({ children }: { children: React.ReactNode }) {
     localStorage.setItem("userProfile", JSON.stringify(profile))
     setHasEmail(true)
   }
+
+  // Leader authentication is independent from a member's local profile.
+  if (pathname === '/church/manage' || pathname === '/connect' || pathname === '/privacy' || pathname === '/terms') return <>{children}</>
 
   // Loading state
   if (hasEmail === null) {
@@ -98,7 +103,7 @@ export default function EmailGate({ children }: { children: React.ReactNode }) {
         <div className="text-center space-y-2">
           <p className="text-blue-200/40 text-xs">
             Your email is used for personalization and subscription management.
-            We never sell or share your data.
+            Permission to connect you with church leadership for care is controlled separately in your profile.
           </p>
           <div className="flex items-center justify-center gap-4 text-xs text-blue-200/30">
             <a href="/privacy" className="hover:text-white/50 transition-colors">Privacy Policy</a>

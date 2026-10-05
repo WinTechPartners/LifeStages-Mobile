@@ -1,16 +1,23 @@
 "use client"
 
 
-import { apiUrl } from "@/lib/api-base"
+import { apiFetch } from "@/lib/api-base"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useDevotional } from "@/context/devotional-context"
 import { useEffect, useRef, useState } from "react"
 import { HeaderDropdown } from "@/components/header-dropdown"
+import { useChurch } from "@/context/church-context"
+import { useLanguage } from "@/context/language-context"
+import { contentCacheKey, optionalUuid } from "@/lib/content-context"
+import { useContentDisplay } from "@/lib/use-content-display"
+import { ContentContextBoundary } from "@/components/content-context-boundary"
 
-export default function SongsPage() {
+function SongsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { devotional } = useDevotional()
+  const { church } = useChurch()
+  const { language } = useLanguage()
   const mainRef = useRef<HTMLDivElement>(null)
   const [songType, setSongType] = useState<"classics" | "original">("classics")
   const [sermonSong, setSermonSong] = useState<any>(null)
@@ -22,9 +29,13 @@ export default function SongsPage() {
   const isSermonMode = searchParams.get('source') === 'sermon'
   const sermonTitle = searchParams.get('title') || ''
   const sermonSummary = searchParams.get('summary') || ''
+  const sermonId = isSermonMode ? optionalUuid(searchParams.get('sermonId')) : undefined
+  const contentId = isSermonMode ? sermonId || JSON.stringify([sermonTitle, sermonSummary]) : devotional.verse?.reference || ''
+  const scopedCache = (kind: string) => contentCacheKey(kind, contentId, church?.id, language)
 
   const originalSong = isSermonMode ? sermonSong : (devotional.songs || {})
   const sourceReference = isSermonMode ? sermonTitle : devotional.verse?.reference
+  useContentDisplay(songType === 'classics' ? !isSearching && classicSongs.some(song => !!song?.title) : !!originalSong?.title, scopedCache('songs_' + songType), 'songs', sermonId)
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -49,7 +60,7 @@ export default function SongsPage() {
     setIsSearching(true)
     try {
       const searchTerm = isSermonMode ? sermonTitle : (devotional.verse?.reference || "faith hope")
-      const cacheKey = `classic_songs_${searchTerm}`.toLowerCase().replace(/[\s:]+/g, "_")
+      const cacheKey = scopedCache('classic_songs')
       const cached = localStorage.getItem(cacheKey)
       if (cached) {
         try {
@@ -64,7 +75,7 @@ export default function SongsPage() {
         }
       }
 
-      const response = await fetch(apiUrl("/api/search-classic-songs", {
+      const response = await apiFetch("/api/search-classic-songs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -88,7 +99,7 @@ export default function SongsPage() {
   const generateSermonSong = async () => {
     setIsGenerating(true)
     try {
-      const cacheKey = `sermon_songs_${sermonTitle}`.toLowerCase().replace(/[\s:]+/g, "_")
+      const cacheKey = scopedCache('sermon_songs')
       const cached = localStorage.getItem(cacheKey)
       if (cached) {
         try {
@@ -103,13 +114,16 @@ export default function SongsPage() {
         }
       }
 
-      const response = await fetch(apiUrl("/api/generate-songs", {
+      const response = await apiFetch("/api/generate-songs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           source: "sermon",
           sermonTitle,
           sermonSummary,
+          sermonId,
+          churchId: church?.id,
+          language,
         }),
       })
 
@@ -340,4 +354,8 @@ export default function SongsPage() {
       </main>
     </div>
   )
+}
+
+export default function SongsPage() {
+  return <ContentContextBoundary><SongsContent /></ContentContextBoundary>
 }

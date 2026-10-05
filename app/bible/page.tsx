@@ -1,16 +1,22 @@
 "use client"
 
 
-import { apiUrl } from "@/lib/api-base"
+import { apiFetch } from "@/lib/api-base"
+import { track, observeForeground } from "@/lib/analytics/client"
+import type { AnalyticsScripture } from "@/lib/analytics/contract"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useSubscription } from "@/context/subscription-context"
 import { HeaderDropdown } from "@/components/header-dropdown"
+import { useChurch } from "@/context/church-context"
+import { resolveScriptureLink } from "@/lib/scripture-link"
+import { optionalUuid } from "@/lib/content-context"
 
 interface Book {
   name: string
   id: string
   chapters: number
+  bookNumber: number
 }
 
 interface Verse {
@@ -29,6 +35,10 @@ type ViewMode = "books" | "chapters" | "reading"
 export default function BiblePage() {
   const router = useRouter()
   const { canAccessPremium } = useSubscription()
+  const { church, isLoading: churchLoading } = useChurch()
+  const openedLink = useRef(false)
+  const linkedVerse = useRef<number | undefined>(undefined)
+  const [linkNotice, setLinkNotice] = useState("")
   
   const [viewMode, setViewMode] = useState<ViewMode>("books")
   const [testament, setTestament] = useState<"old" | "new">("old")
@@ -40,6 +50,12 @@ export default function BiblePage() {
   const [verses, setVerses] = useState<Verse[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [translation, setTranslation] = useState("KJV")
+  const [analyticsView, setAnalyticsView] = useState<{ id: string; scripture: AnalyticsScripture; sermonId?: string } | null>(null)
+  const [chapterError, setChapterError] = useState("")
+  const chapterRequest = useRef(0)
+  const chapterViewId = useRef<string | null>(null)
+  const displayedViews = useRef(new Set<string>())
+  const selectedNumbers = useRef<number[]>([])
   
   // Load translation preference from profile
   useEffect(() => {
@@ -64,9 +80,10 @@ export default function BiblePage() {
     const profile = savedProfile ? JSON.parse(savedProfile) : {}
     profile.bibleTranslation = newTranslation
     localStorage.setItem("userProfile", JSON.stringify(profile))
+    window.dispatchEvent(new Event("lifestages-profile-changed"))
     // Reload chapter if one is selected
     if (selectedBook && selectedChapter) {
-      setTimeout(() => loadChapter(selectedBook, selectedChapter), 100)
+      void loadChapter(selectedBook, selectedChapter, newTranslation, analyticsView?.sermonId)
     }
   }
   
@@ -88,7 +105,7 @@ export default function BiblePage() {
   useEffect(() => {
     setBooksLoading(true)
     setBooksError(null)
-    fetch(apiUrl("/api/bible?action=books")
+    apiFetch("/api/bible?action=books")
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
@@ -105,8 +122,14 @@ export default function BiblePage() {
   }, [])
 
   // Load chapter content
-  const loadChapter = useCallback(async (book: Book, chapter: number) => {
+  const loadChapter = useCallback(async (book: Book, chapter: number, requestedTranslation = translation, sermonId?: string) => {
+    const requestId = ++chapterRequest.current
     setIsLoading(true)
+    setIsExplaining(false)
+    setChapterError("")
+    setAnalyticsView(null)
+    chapterViewId.current = null
+    selectedNumbers.current = []
     // Clear any selection state when loading new chapter
     setShowExplainButton(false)
     setShowExplanation(false)
@@ -114,22 +137,59 @@ export default function BiblePage() {
     setSelectedVerseNum(null)
     
     try {
-      const url = `/api/bible?action=read&book=${encodeURIComponent(book.name)}&chapter=${chapter}&version=${translation}`
-      console.log("[Bible] Loading chapter:", url)
-      const res = await fetch(url)
+      const url = `/api/bible?action=read&book=${encodeURIComponent(book.name)}&chapter=${chapter}&version=${encodeURIComponent(requestedTranslation)}`
+      const res = await apiFetch(url)
       const data = await res.json()
-      console.log("[Bible] Chapter response:", data?.verses?.length, "verses")
-      if (data.error) {
-        console.error("[Bible] API error:", data.error)
-      }
+      if (requestId !== chapterRequest.current) return
+      if (!res.ok || data.error || !Array.isArray(data.verses) || !data.verses.length) throw new Error("Chapter unavailable")
       setVerses(data.verses || [])
+      setSelectedBook(book)
       setSelectedChapter(chapter)
       setViewMode("reading")
+      const id = crypto.randomUUID()
+      chapterViewId.current = id
+      const canonicalBooks = booksData ? [...booksData.oldTestament, ...booksData.newTestament] : []
+      const bookNumber = book.bookNumber || canonicalBooks.findIndex(item => item.id === book.id) + 1
+      if (bookNumber > 0) setAnalyticsView({ id, scripture: { book: bookNumber, chapter, translation: requestedTranslation }, sermonId })
     } catch (error) {
-      console.error("[Bible] Failed to load chapter:", error)
+      if (requestId === chapterRequest.current) setChapterError("Could not load this chapter. Please try again.")
     }
-    setIsLoading(false)
-  }, [translation])
+    if (requestId === chapterRequest.current) setIsLoading(false)
+  }, [translation, booksData])
+
+  useEffect(() => {
+    if (!booksData || churchLoading || openedLink.current) return
+    openedLink.current = true
+    const params = new URLSearchParams(window.location.search)
+    const reference = params.get('verse')
+    if (!reference) return
+    const passage = resolveScriptureLink(reference, [...booksData.oldTestament, ...booksData.newTestament])
+    if (!passage) { setLinkNotice(`Choose the passage in the Bible below: ${reference}`); return }
+    const sermonId = params.get('churchId') === church?.id ? optionalUuid(params.get('sermonId')) : undefined
+    linkedVerse.current = passage.firstVerse
+    setLinkNotice(`Opened ${reference}. Tap a verse to explore it.`)
+    void loadChapter(passage.book, passage.chapter, translation, sermonId)
+  }, [booksData, churchLoading, church?.id, loadChapter, translation])
+
+  useEffect(() => {
+    if (viewMode !== 'reading' || isLoading || linkedVerse.current === undefined) return
+    verseRefs.current.get(linkedVerse.current)?.scrollIntoView({ block: 'center' })
+    linkedVerse.current = undefined
+  }, [viewMode, isLoading, verses])
+
+  useEffect(() => {
+    if (!analyticsView || viewMode !== "reading" || isLoading) return
+    const { id: viewId, scripture, sermonId } = analyticsView
+    const displayed = () => {
+      if (document.visibilityState !== "visible" || displayedViews.current.has(viewId)) return
+      displayedViews.current.add(viewId)
+      track("chapter_displayed", { viewId, scripture, sermonId, contentType: "bible" })
+    }
+    displayed()
+    document.addEventListener("visibilitychange", displayed)
+    const stop = observeForeground({ viewId, scripture, sermonId, contentType: "bible" })
+    return () => { stop(); document.removeEventListener("visibilitychange", displayed) }
+  }, [analyticsView, viewMode, isLoading])
 
   // Handle tap/click on verse to select entire verse
   const handleVerseClick = useCallback((verse: Verse, event: React.MouseEvent | React.TouchEvent) => {
@@ -160,6 +220,8 @@ export default function BiblePage() {
     // Update state
     setSelectedText(verse.text)
     setSelectedVerseNum(verse.number)
+    selectedNumbers.current = [verse.number]
+    if (analyticsView) track("verse_selected", { viewId: analyticsView.id, sermonId: analyticsView.sermonId, scripture: { ...analyticsView.scripture, verses: [verse.number] }, contentType: "bible" })
     
     // Position the button near the tap location
     const rect = verseEl.getBoundingClientRect()
@@ -171,7 +233,7 @@ export default function BiblePage() {
     setShowExplanation(false)
     setExplanation("")
     setExplainError("")
-  }, [])
+  }, [analyticsView])
 
   // Handle text selection - check for selection periodically
   useEffect(() => {
@@ -181,12 +243,18 @@ export default function BiblePage() {
       const selection = window.getSelection()
       const text = selection?.toString().trim()
       
-      if (text && text.length > 10) {
+      if (text && text.length > 10 && selection?.anchorNode && selection.focusNode && contentRef.current?.contains(selection.anchorNode) && contentRef.current.contains(selection.focusNode)) {
         try {
           const range = selection?.getRangeAt(0)
           const rect = range?.getBoundingClientRect()
+          const numbers = [...verseRefs.current].filter(([, node]) => range?.intersectsNode(node)).map(([number]) => number).sort((a,b) => a-b)
           
           if (rect && rect.width > 0) {
+            if (numbers.length && numbers.join(",") !== selectedNumbers.current.join(",") && analyticsView) {
+              track("verse_selected", { viewId: analyticsView.id, sermonId: analyticsView.sermonId, scripture: { ...analyticsView.scripture, verses: numbers }, contentType: "bible" })
+            }
+            selectedNumbers.current = numbers
+            setSelectedVerseNum(numbers.length === 1 ? numbers[0] : null)
             setSelectedText(text)
             setButtonPosition({
               x: rect.left + rect.width / 2,
@@ -233,7 +301,7 @@ export default function BiblePage() {
       document.removeEventListener("touchend", handleTouchEnd)
       document.removeEventListener("selectionchange", handleSelectionChange)
     }
-  }, [viewMode, showExplanation])
+  }, [viewMode, showExplanation, analyticsView])
 
   // Explain selected text
   const explainSelection = async () => {
@@ -245,6 +313,10 @@ export default function BiblePage() {
 
     setIsExplaining(true)
     setExplainError("")
+    const explanationViewId = chapterViewId.current
+    const scripture = analyticsView && selectedNumbers.current.length
+      ? { ...analyticsView.scripture, verses: [...selectedNumbers.current] } : undefined
+    if (scripture && explanationViewId) track("explanation_requested", { viewId: explanationViewId, scripture, sermonId: analyticsView?.sermonId, contentType: "bible" })
     
     try {
       const profile = JSON.parse(localStorage.getItem("userProfile") || "{}")
@@ -252,9 +324,7 @@ export default function BiblePage() {
         ? `${selectedBook?.name} ${selectedChapter}:${selectedVerseNum}`
         : `${selectedBook?.name} ${selectedChapter}`
       
-      console.log("[Bible] Calling explain API for:", selectedText.substring(0, 30), "...", "ref:", reference)
-      
-      const res = await fetch(apiUrl("/api/bible/explain", {
+      const res = await apiFetch("/api/bible/explain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -266,19 +336,20 @@ export default function BiblePage() {
       })
       
       const data = await res.json()
-      console.log("[Bible] Explain response:", data)
-      
-      if (data.error) {
+      if (explanationViewId !== chapterViewId.current) return
+      if (!res.ok || data.error) {
         setExplainError(data.error + (data.details ? `: ${data.details}` : ""))
         setExplanation("")
       } else if (data.explanation) {
         setExplanation(data.explanation)
         setShowExplanation(true)
         setShowExplainButton(false)
+        if (scripture && explanationViewId && document.visibilityState === "visible") track("explanation_displayed", { viewId: explanationViewId, scripture, sermonId: analyticsView?.sermonId, contentType: "bible" })
       } else {
         setExplainError("No explanation returned")
       }
     } catch (error) {
+      if (explanationViewId !== chapterViewId.current) return
       console.error("[Bible] Failed to explain:", error)
       setExplainError("Network error - please try again")
     }
@@ -293,6 +364,7 @@ export default function BiblePage() {
     setExplainError("")
     setSelectedText("")
     setSelectedVerseNum(null)
+    selectedNumbers.current = []
     window.getSelection()?.removeAllRanges()
   }
 
@@ -304,6 +376,9 @@ export default function BiblePage() {
       <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between px-4 bg-[#0c1929]/95 backdrop-blur-sm border-b border-white/10">
         <button
           onClick={() => {
+            chapterRequest.current++
+            chapterViewId.current = null
+            setIsLoading(false)
             if (viewMode === "reading") setViewMode("chapters")
             else if (viewMode === "chapters") setViewMode("books")
             else router.back()
@@ -337,6 +412,8 @@ export default function BiblePage() {
       </header>
 
       <main className="flex-1 overflow-y-auto" ref={contentRef}>
+        {linkNotice && <p className="p-4 text-blue-100 text-sm" role="status">{linkNotice}</p>}
+        {chapterError && <p className="p-4 text-amber-200 text-sm" role="alert">{chapterError}</p>}
         {/* BOOKS VIEW */}
         {viewMode === "books" && (
           <div className="p-4">
@@ -449,9 +526,10 @@ export default function BiblePage() {
                     key={verse.number} 
                     ref={el => {
                       if (el) verseRefs.current.set(verse.number, el)
+                      else verseRefs.current.delete(verse.number)
                     }}
                     onClick={(e) => handleVerseClick(verse, e)}
-                    className={`text-blue-100/90 text-[17px] leading-relaxed cursor-pointer rounded-lg px-2 py-1 -mx-2 transition-colors ${
+                    className={`whitespace-pre-line text-blue-100/90 text-[17px] leading-relaxed cursor-pointer rounded-lg px-2 py-1 -mx-2 transition-colors ${
                       selectedVerseNum === verse.number 
                         ? "bg-amber-500/20 border-l-2 border-amber-400" 
                         : "hover:bg-white/5 active:bg-amber-500/10"

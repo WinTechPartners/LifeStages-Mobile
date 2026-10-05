@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, type ReactNode, useCallback, useRef } from "react"
 import { useLanguage } from "./language-context"
 import { apiUrl } from "@/lib/api-base"
+import { useChurch } from "./church-context"
 
 export interface VerseData {
   reference: string
@@ -123,7 +124,7 @@ interface UserProfile {
   stageSituation: string
   language?: string
   contentStyle?: "casual" | "academic"
-  churchId?: string
+  churchId?: string | null
 }
 
 export function DevotionalProvider({ children }: { children: ReactNode }) {
@@ -134,6 +135,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
   const [userName, setUserName] = useState("Friend")
   const [isContentReady, setIsContentReady] = useState(false)
   const { language: selectedLanguage } = useLanguage()
+  const { church, isLoading: churchLoading } = useChurch()
   
   // Track loading state to prevent duplicate calls
   const isLoadingRef = useRef(false)
@@ -151,7 +153,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
           stageSituation: parsed.stageSituation || parsed.season || "General",
           language: selectedLanguage,
           contentStyle: parsed.contentStyle || "casual",
-          churchId: parsed.churchId || null,
+          churchId: church?.id || null,
         }
       }
     } catch (e) {
@@ -163,9 +165,9 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
       stageSituation: "General",
       language: selectedLanguage,
       contentStyle: "casual",
-      churchId: null,
+      churchId: church?.id || null,
     }
-  }, [selectedLanguage])
+  }, [selectedLanguage, church?.id])
 
   // Load username on mount
   React.useEffect(() => {
@@ -470,6 +472,8 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
    * MAIN: Generate devotional
    */
   const generateDevotional = useCallback(async (source = "YouVersion") => {
+    // The profile stores a church code; APIs require the resolved church UUID.
+    if (churchLoading) return
     // STRICT duplicate prevention
     if (isLoadingRef.current) {
       console.log("[Generate] Already loading, ignoring duplicate call")
@@ -477,7 +481,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
     }
     
     const profile = getFreshProfile()
-    const cacheKey = `${source}-${profile.ageRange}-${profile.gender}-${profile.stageSituation}-${profile.language}`
+    const cacheKey = JSON.stringify([source, profile.churchId, profile.ageRange, profile.gender, profile.stageSituation, profile.language, profile.contentStyle])
     
     // If we already loaded this exact combination, skip
     if (lastLoadedKeyRef.current === cacheKey && devotional.verse) {
@@ -562,7 +566,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
     } finally {
       isLoadingRef.current = false
     }
-  }, [devotional.verse, generatePremiumContentInBackground, getDevotionalContent, getFreshProfile, getVerseFast])
+  }, [churchLoading, devotional.verse, generatePremiumContentInBackground, getDevotionalContent, getFreshProfile, getVerseFast])
 
   const generateForVerse = useCallback(async (verseQuery: string) => {
     lastLoadedKeyRef.current = null

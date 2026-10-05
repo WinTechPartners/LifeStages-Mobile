@@ -38,7 +38,7 @@ Return JSON only:
     "actionSteps": "What concrete action steps can someone take this week? Be specific and practical. What would living out this message look like in daily life?"
   }
 }`,
-        maxTokens: 2500,
+        maxOutputTokens: 2500,
       })
 
       const data = parseLLMJson(text)
@@ -65,7 +65,7 @@ Return JSON only:
   },
   "contextImagePrompt": "Cinematic historical scene capturing this moment, specific and evocative, 25 words"
 }`,
-        maxTokens: 2500,
+        maxOutputTokens: 2500,
       })
 
       const data = parseLLMJson(text)

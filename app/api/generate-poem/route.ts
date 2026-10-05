@@ -53,7 +53,7 @@ POEM===
 IMAGE===
 [Artistic, painterly scene that captures the poem's mood - 25 words]
 ===IMAGE`,
-      maxTokens: 800,
+      maxOutputTokens: 800,
     })
 
     const titleMatch = text.match(/TITLE===\s*(.+?)\s*===TITLE/s)

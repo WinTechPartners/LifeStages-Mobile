@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
+import { fileURLToPath } from 'node:url'
 const isMobile = process.env.BUILD_TARGET === 'mobile'
 
 const nextConfig = {
+  outputFileTracingRoot: fileURLToPath(new URL('.', import.meta.url)),
   // Static export for Capacitor mobile builds
   // Web builds continue to use server-side rendering
   ...(isMobile && {

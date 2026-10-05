@@ -35,7 +35,7 @@ Guidelines:
       model: openrouter(modelId),
       system: systemPrompt,
       prompt,
-      maxTokens: 500,
+      maxOutputTokens: 500,
     })
 
     return Response.json({ response: text })

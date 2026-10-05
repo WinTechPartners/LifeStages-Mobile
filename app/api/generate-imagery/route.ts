@@ -116,7 +116,7 @@ Good icon options: auto_awesome, water_drop, spa, wb_sunny, landscape, favorite,
       model: openrouter(modelId),
       system: systemPrompt,
       prompt,
-      maxTokens: 1500,
+      maxOutputTokens: 1500,
     })
 
     const data = parseLLMJson(text.replace(/```json|```/g, "").trim())

@@ -47,7 +47,7 @@ Return JSON only:
 }
 
 Remember: Only REAL stories with REAL people. If you can't find 3 verified stories, return fewer.`,
-      maxTokens: 1500,
+      maxOutputTokens: 1500,
     })
 
     const data = parseLLMJson(text.replace(/```json|```/g, "").trim())

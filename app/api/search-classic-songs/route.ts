@@ -46,7 +46,7 @@ Include a mix of:
 - 1-2 modern worship songs (Hillsong, Elevation, Bethel, Chris Tomlin, etc.)
 
 Make sure URLs are properly encoded (spaces become + or %20).`,
-      maxTokens: 1200,
+      maxOutputTokens: 1200,
     })
 
     const data = parseLLMJson<{ songs?: any[] }>(text.replace(/```json|```/g, "").trim())
