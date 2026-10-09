@@ -1,6 +1,8 @@
 // Bible API - Uses bolls.life API (free, many translations)
 // Has popular translations including modern ones
 
+import { cacheGet, cacheSet } from "@/lib/content-cache"
+
 // Chapter counts for each book
 const CHAPTER_COUNTS: Record<string, number> = {
   "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
@@ -38,7 +40,7 @@ const BOOK_IDS: Record<string, number> = {
 }
 
 // Top 10 translations - mix of popular and freely available
-// Note: NIV, ESV, NLT, NKJV are copyrighted but bolls.life has them
+// Provider availability is separate from the translation catalogue.
 const TRANSLATIONS = [
   { id: "NIV", name: "New International Version", abbr: "NIV" },
   { id: "KJV", name: "King James Version", abbr: "KJV" },
@@ -50,14 +52,33 @@ const TRANSLATIONS = [
   { id: "CSB", name: "Christian Standard Bible", abbr: "CSB" },
   { id: "WEB", name: "World English Bible", abbr: "WEB" },
   { id: "YLT", name: "Young's Literal Translation", abbr: "YLT" },
+  { id: "VI1934", name: "Kinh Thánh Tiếng Việt (1934)", abbr: "VIỆT" },
 ]
+
+// Vietnamese book names (Kinh Thánh 1934 naming), keyed by the English name used everywhere else
+const VI_BOOK_NAMES: Record<string, string> = {
+  "Genesis": "Sáng Thế Ký", "Exodus": "Xuất Ê-díp-tô Ký", "Leviticus": "Lê-vi Ký", "Numbers": "Dân Số Ký", "Deuteronomy": "Phục Truyền Luật Lệ Ký",
+  "Joshua": "Giô-suê", "Judges": "Các Quan Xét", "Ruth": "Ru-tơ", "1 Samuel": "1 Sa-mu-ên", "2 Samuel": "2 Sa-mu-ên",
+  "1 Kings": "1 Các Vua", "2 Kings": "2 Các Vua", "1 Chronicles": "1 Sử Ký", "2 Chronicles": "2 Sử Ký", "Ezra": "E-xơ-ra",
+  "Nehemiah": "Nê-hê-mi", "Esther": "Ê-xơ-tê", "Job": "Gióp", "Psalms": "Thi Thiên", "Proverbs": "Châm Ngôn",
+  "Ecclesiastes": "Truyền Đạo", "Song of Solomon": "Nhã Ca", "Isaiah": "Ê-sai", "Jeremiah": "Giê-rê-mi", "Lamentations": "Ca Thương",
+  "Ezekiel": "Ê-xê-chi-ên", "Daniel": "Đa-ni-ên", "Hosea": "Ô-sê", "Joel": "Giô-ên", "Amos": "A-mốt",
+  "Obadiah": "Áp-đia", "Jonah": "Giô-na", "Micah": "Mi-chê", "Nahum": "Na-hum", "Habakkuk": "Ha-ba-cúc",
+  "Zephaniah": "Sô-phô-ni", "Haggai": "A-ghê", "Zechariah": "Xa-cha-ri", "Malachi": "Ma-la-chi",
+  "Matthew": "Ma-thi-ơ", "Mark": "Mác", "Luke": "Lu-ca", "John": "Giăng", "Acts": "Công Vụ Các Sứ Đồ",
+  "Romans": "Rô-ma", "1 Corinthians": "1 Cô-rinh-tô", "2 Corinthians": "2 Cô-rinh-tô", "Galatians": "Ga-la-ti", "Ephesians": "Ê-phê-sô",
+  "Philippians": "Phi-líp", "Colossians": "Cô-lô-se", "1 Thessalonians": "1 Tê-sa-lô-ni-ca", "2 Thessalonians": "2 Tê-sa-lô-ni-ca", "1 Timothy": "1 Ti-mô-thê",
+  "2 Timothy": "2 Ti-mô-thê", "Titus": "Tít", "Philemon": "Phi-lê-môn", "Hebrews": "Hê-bơ-rơ", "James": "Gia-cơ",
+  "1 Peter": "1 Phi-e-rơ", "2 Peter": "2 Phi-e-rơ", "1 John": "1 Giăng", "2 John": "2 Giăng", "3 John": "3 Giăng",
+  "Jude": "Giu-đe", "Revelation": "Khải Huyền"
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const action = searchParams.get("action")
   const book = searchParams.get("book")
   const chapter = searchParams.get("chapter")
-  const version = searchParams.get("version") || "KJV"
+  const version = (searchParams.get("version") || "KJV").toUpperCase()
 
   try {
     // Get list of books
@@ -84,11 +105,13 @@ export async function GET(request: Request) {
       return Response.json({
         oldTestament: oldTestament.map(name => ({
           name,
+          viName: VI_BOOK_NAMES[name] || name,
           id: name.toLowerCase().replace(/ /g, "-"),
           chapters: CHAPTER_COUNTS[name]
         })),
         newTestament: newTestament.map(name => ({
           name,
+          viName: VI_BOOK_NAMES[name] || name,
           id: name.toLowerCase().replace(/ /g, "-"),
           chapters: CHAPTER_COUNTS[name]
         })),
@@ -107,10 +130,23 @@ export async function GET(request: Request) {
 
     // Get verses for a chapter using bolls.life API
     if (action === "read" && book && chapter) {
+      // The provider replaced NIV verse fields with its own publisher-dispute notice.
+      // Block before cache lookup: previously cached responses contain that same notice.
+      if (version === "NIV") {
+        return Response.json({
+          code: "NIV_UNAVAILABLE",
+          error: "NIV is unavailable from our Bible text provider. Please choose another translation."
+        }, { status: 503 })
+      }
       const bookId = BOOK_IDS[book]
       if (!bookId) {
         return Response.json({ error: "Book not found" }, { status: 404 })
       }
+
+      // Bible text is stable: serve from the global cache (365 days) before hitting bolls.life
+      const chapterKey = { book, chapter, version }
+      const cachedChapter = await cacheGet("bible-chapter", chapterKey)
+      if (cachedChapter) return Response.json(cachedChapter)
 
       // bolls.life API: https://bolls.life/get-chapter/{translation}/{book_id}/{chapter}/
       const url = `https://bolls.life/get-chapter/${version}/${bookId}/${chapter}/`
@@ -153,6 +189,9 @@ export async function GET(request: Request) {
           .replace(/<sup>.*?<\/sup>/gi, '')   // Remove footnote / translator-note superscripts
           .replace(/<br\s*\/?>/gi, '\n')      // Convert line breaks (headings & poetry) to real newlines
           .replace(/<[^>]*>/g, '')            // Strip any remaining tags (i, b, etc.), keep inner text
+          .replace(/\[[a-z0-9]{1,3}\]/gi, '') // Remove footnote / cross-reference markers like [1] [a]
+          .replace(/\b[HG]\d{1,5}\b/g, '')    // Remove Strong's codes like H1234 / G5678 if they leak as text
+          .replace(/(^|\s)\d{3,5}(?=\s|$)/g, '$1') // Remove stray bare Strong's numbers left in the text
           .replace(/[ \t]+([,.;:!?])/g, '$1') // Remove stray space left before punctuation
           .replace(/[ \t]{2,}/g, ' ')         // Collapse runs of spaces (preserve newlines)
           .replace(/[ \t]*\n[ \t]*/g, '\n')   // Trim spaces around newlines
@@ -160,12 +199,9 @@ export async function GET(request: Request) {
           .trim()
       }))
 
-      return Response.json({
-        book,
-        chapter: parseInt(chapter),
-        version,
-        verses
-      })
+      const result = { book, chapter: parseInt(chapter), version, verses }
+      if (verses.length > 0) await cacheSet("bible-chapter", chapterKey, result)
+      return Response.json(result)
     }
 
     return Response.json({ error: "Invalid action" }, { status: 400 })

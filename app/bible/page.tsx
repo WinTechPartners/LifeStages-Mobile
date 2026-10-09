@@ -138,6 +138,10 @@ export default function BiblePage() {
     setShowExplanation(false)
     setSelectedText("")
     setSelectedVerseNum(null)
+    setVerses([])
+    setSelectedBook(book)
+    setSelectedChapter(chapter)
+    setViewMode("reading")
     
     try {
       const url = `/api/bible?action=read&book=${encodeURIComponent(book.name)}&chapter=${chapter}&version=${encodeURIComponent(requestedTranslation)}`
@@ -155,7 +159,9 @@ export default function BiblePage() {
       const bookNumber = book.bookNumber || canonicalBooks.findIndex(item => item.id === book.id) + 1
       if (bookNumber > 0) setAnalyticsView({ id, scripture: { book: bookNumber, chapter, translation: requestedTranslation }, sermonId })
     } catch (error) {
-      if (requestId === chapterRequest.current) setChapterError("Could not load this chapter. Please try again.")
+      if (requestId === chapterRequest.current) setChapterError(requestedTranslation === "NIV"
+        ? "NIV is unavailable from our Bible text provider. Please choose another translation above."
+        : "Could not load this chapter. Please try again.")
     }
     if (requestId === chapterRequest.current) setIsLoading(false)
   }, [translation, booksData])
@@ -421,7 +427,6 @@ export default function BiblePage() {
 
       <main className="min-h-0 flex-1 overflow-y-auto pb-8 scroll-pt-4" ref={contentRef}>
         {linkNotice && <p className="p-4 text-blue-100 text-sm" role="status">{linkNotice}</p>}
-        {chapterError && <p className="p-4 text-amber-200 text-sm" role="alert">{chapterError}</p>}
         {/* BOOKS VIEW */}
         {viewMode === "books" && (
           <div className="p-4">
@@ -519,6 +524,8 @@ export default function BiblePage() {
                 <div className="size-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mb-3"></div>
                 <p className="text-blue-200/70">Loading chapter...</p>
               </div>
+            ) : chapterError ? (
+              <p role="alert" className="text-center text-blue-200 py-10">{chapterError}</p>
             ) : (
               <div className="space-y-4">
                 {/* Hint */}
