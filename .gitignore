@@ -7,8 +7,7 @@ out/
 .mobile-build-*/
 .mobile-out-backup-*/
 build/
-ios/
-android/
+/ios/
+/android/
 *.tsbuildinfo
 .env*
-

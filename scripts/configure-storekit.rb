@@ -7,6 +7,10 @@ project = Xcodeproj::Project.open(File.join(root, 'ios/App/App.xcodeproj'))
 group = project.main_group.find_subpath('App', false)
 target = project.targets.find { |t| t.name == 'App' }
 raise 'App target or group missing' unless group && target
+required_native = %w[LifeStagesBridgeViewController.swift LifeStagesStoreKitPlugin.swift]
+required_native.each do |file|
+  raise "Required native source missing: #{file}" unless File.file?(File.join(root, 'native/ios', file))
+end
 Dir[File.join(root, 'native/ios/*.swift')].each do |source|
   file = File.basename(source)
   FileUtils.cp(source, File.join(app, file))
