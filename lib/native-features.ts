@@ -193,7 +193,7 @@ export function cacheVerseForOffline(verse: {
   try {
     const today = new Date().toISOString().split('T')[0]
     // Legacy single-verse cache
-    localStorage.setItem('offline_last_verse', JSON.stringify({
+    localStorage.setItem('offline_web_last_verse', JSON.stringify({
       ...verse,
       cachedAt: new Date().toISOString(),
     }))
@@ -205,7 +205,7 @@ export function cacheVerseForOffline(verse: {
       cachedAt: new Date().toISOString(),
     }))
     // Track cached dates (keep last 8)
-    const datesKey = 'votd_cached_dates'
+    const datesKey = 'votd_web_cached_dates'
     const dates: string[] = JSON.parse(localStorage.getItem(datesKey) || '[]')
     if (!dates.includes(today)) {
       dates.unshift(today)
@@ -217,7 +217,7 @@ export function cacheVerseForOffline(verse: {
 
 export function getOfflineVerse(): CachedVerse | null {
   try {
-    const cached = localStorage.getItem('offline_last_verse')
+    const cached = localStorage.getItem('offline_web_last_verse')
     return cached ? JSON.parse(cached) : null
   } catch (e) {
     return null
@@ -229,7 +229,7 @@ export function getOfflineVerse(): CachedVerse | null {
  */
 export function getCachedVerseForDate(date: string): CachedVerse | null {
   try {
-    const cached = localStorage.getItem(`votd_v3_${date}`)
+    const cached = localStorage.getItem(`votd_web_v1_${date}`)
     return cached ? JSON.parse(cached) : null
   } catch (e) {
     return null
@@ -246,12 +246,12 @@ export function cacheVerseForDate(date: string, verse: {
   heroImage?: string
 }) {
   try {
-    localStorage.setItem(`votd_v3_${date}`, JSON.stringify({
+    localStorage.setItem(`votd_web_v1_${date}`, JSON.stringify({
       ...verse,
       date,
       cachedAt: new Date().toISOString(),
     }))
-    const datesKey = 'votd_cached_dates'
+    const datesKey = 'votd_web_cached_dates'
     const dates: string[] = JSON.parse(localStorage.getItem(datesKey) || '[]')
     if (!dates.includes(date)) {
       dates.push(date)
@@ -267,7 +267,7 @@ export function cacheVerseForDate(date: string, verse: {
  */
 export function getCachedDates(): string[] {
   try {
-    return JSON.parse(localStorage.getItem('votd_cached_dates') || '[]')
+    return JSON.parse(localStorage.getItem('votd_web_cached_dates') || '[]')
   } catch (e) {
     return []
   }

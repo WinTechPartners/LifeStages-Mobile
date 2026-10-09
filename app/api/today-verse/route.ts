@@ -1,3 +1,4 @@
+import { webPassage, scheduledFallback } from '@/lib/web-scripture'
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 
@@ -22,9 +23,9 @@ export async function GET(request: NextRequest) {
       if (churchVerse) {
         return NextResponse.json({
           reference: churchVerse.verse_reference,
-          text: churchVerse.verse_text,
-          version: 'NIV',
-          bible_url: churchVerse.bible_url,
+          text: (await webPassage(churchVerse.verse_reference)).text,
+          version: 'WEB',
+          bible_url: null,
           source: 'church'
         })
       }
@@ -39,9 +40,9 @@ export async function GET(request: NextRequest) {
     if (defaultVerse) {
       return NextResponse.json({
         reference: defaultVerse.verse_reference,
-        text: defaultVerse.verse_text,
-        version: 'NIV',
-        bible_url: defaultVerse.bible_url,
+        text: (await webPassage(defaultVerse.verse_reference)).text,
+        version: 'WEB',
+        bible_url: null,
         source: 'database'
       })
     }
@@ -49,22 +50,10 @@ export async function GET(request: NextRequest) {
     console.log('[Today Verse] No verse in database for', today, '- returning null to trigger fallback')
 
     // Return null so the frontend knows to use generate-verse API instead
-    return NextResponse.json({
-      reference: null,
-      text: null,
-      version: null,
-      source: 'none',
-      message: `No verse in database for ${today}`
-    })
+    return NextResponse.json(scheduledFallback(today))
 
   } catch (error) {
     console.error('[Today Verse] Error:', error)
-    return NextResponse.json({
-      reference: null,
-      text: null,
-      version: null,
-      source: 'error',
-      message: String(error)
-    })
+    return NextResponse.json(scheduledFallback(new Date().toISOString().slice(0,10)))
   }
 }

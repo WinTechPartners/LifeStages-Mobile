@@ -44,7 +44,7 @@ export default function ProfilePage() {
     contentStyle: "casual",
     churchId: "",
     country: "",
-    bibleTranslation: "KJV",
+    bibleTranslation: "WEB",
   })
 
   // Load from localStorage on mount
@@ -71,7 +71,7 @@ export default function ProfilePage() {
         contentStyle: parsed.contentStyle || "casual",
         churchId: parsed.churchId || "",
         country: parsed.country || "",
-        bibleTranslation: parsed.bibleTranslation || "KJV",
+        bibleTranslation: "WEB",
       })
     } catch { /* Keep the editable empty form if a local profile cannot be read. */ }
   }, [])

@@ -41,19 +41,7 @@ const BOOK_IDS: Record<string, number> = {
 
 // Top 10 translations - mix of popular and freely available
 // Provider availability is separate from the translation catalogue.
-const TRANSLATIONS = [
-  { id: "NIV", name: "New International Version", abbr: "NIV" },
-  { id: "KJV", name: "King James Version", abbr: "KJV" },
-  { id: "ESV", name: "English Standard Version", abbr: "ESV" },
-  { id: "NLT", name: "New Living Translation", abbr: "NLT" },
-  { id: "NKJV", name: "New King James Version", abbr: "NKJV" },
-  { id: "NASB", name: "New American Standard Bible", abbr: "NASB" },
-  { id: "AMP", name: "Amplified Bible", abbr: "AMP" },
-  { id: "CSB", name: "Christian Standard Bible", abbr: "CSB" },
-  { id: "WEB", name: "World English Bible", abbr: "WEB" },
-  { id: "YLT", name: "Young's Literal Translation", abbr: "YLT" },
-  { id: "VI1934", name: "Kinh Thánh Tiếng Việt (1934)", abbr: "VIỆT" },
-]
+const TRANSLATIONS = [{ id: "WEB", name: "World English Bible", abbr: "WEB" }]
 
 // Vietnamese book names (Kinh Thánh 1934 naming), keyed by the English name used everywhere else
 const VI_BOOK_NAMES: Record<string, string> = {
@@ -78,7 +66,7 @@ export async function GET(request: Request) {
   const action = searchParams.get("action")
   const book = searchParams.get("book")
   const chapter = searchParams.get("chapter")
-  const version = (searchParams.get("version") || "KJV").toUpperCase()
+  const version = (searchParams.get("version") || "WEB").toUpperCase()
 
   try {
     // Get list of books
@@ -132,12 +120,7 @@ export async function GET(request: Request) {
     if (action === "read" && book && chapter) {
       // The provider replaced NIV verse fields with its own publisher-dispute notice.
       // Block before cache lookup: previously cached responses contain that same notice.
-      if (version === "NIV") {
-        return Response.json({
-          code: "NIV_UNAVAILABLE",
-          error: "NIV is unavailable from our Bible text provider. Please choose another translation."
-        }, { status: 503 })
-      }
+      if (version !== "WEB") return Response.json({code:"TRANSLATION_UNAVAILABLE", error:"World English Bible is currently available. More Bible translations are planned by the end of 2026."}, {status:400})
       const bookId = BOOK_IDS[book]
       if (!bookId) {
         return Response.json({ error: "Book not found" }, { status: 404 })
@@ -162,7 +145,7 @@ export async function GET(request: Request) {
       if (!response.ok) {
         console.error("[Bible API] bolls.life error:", response.status)
         // Fallback to bible-api.com for KJV/WEB
-        if (version === "KJV" || version === "WEB") {
+        if (version === "WEB") {
           const fallbackUrl = `https://bible-api.com/${encodeURIComponent(book)}+${chapter}?translation=${version.toLowerCase()}`
           console.log("[Bible API] Falling back to bible-api.com:", fallbackUrl)
           const fallbackRes = await fetch(fallbackUrl)

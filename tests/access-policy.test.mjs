@@ -7,7 +7,7 @@ const require=createRequire(import.meta.url), ts=require('typescript')
 function load(file,mocks={},extra={}) {
   const exports={}
   const code=ts.transpileModule(fs.readFileSync(new URL('../lib/'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
-  vm.runInNewContext(code,{exports,require:id=>mocks[id]||(id.startsWith('./')?load(id.slice(2)+'.ts',mocks,extra):require(id)),Date,AbortSignal,process:{env:{}},...extra})
+  vm.runInNewContext(code,{exports,require:id=>mocks[id]||(id==='./web-scripture'?{webPassage:async reference=>({reference,text:'WEB verified text',version:'WEB'})}:null)||(id.startsWith('./')?load(id.slice(2)+'.ts',mocks,extra):require(id)),Date,AbortSignal,process:{env:{}},...extra})
   return exports
 }
 test('free profiles cannot opt themselves into personalization',async()=>{

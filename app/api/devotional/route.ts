@@ -1,3 +1,4 @@
+import { webPassage } from '@/lib/web-scripture'
 import { entitlementProfile, hasPremium } from '@/lib/entitlements'
 import { cacheGet, cacheSet } from '@/lib/content-cache'
 import { preserveImage } from '@/lib/stored-images'
@@ -79,6 +80,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    verse_text = (await webPassage(verse_reference)).text
+
     // Build cache key
     const cacheKey = {
       verse_reference,
@@ -108,7 +111,7 @@ export async function POST(request: NextRequest) {
           verse: {
             reference: cached.verse_reference,
             text: cached.verse_text,
-            version: 'NIV'
+            version: 'WEB'
           },
           reflection: cached.reflection,
           application: cached.application,
@@ -213,7 +216,7 @@ Return JSON only: reflection (2-3 paragraphs of Friendly Breakdown), application
         verse: {
           reference: verse_reference,
           text: verse_text,
-          version: 'NIV'
+          version: 'WEB'
         },
         reflection: content.reflection,
         application: content.application,

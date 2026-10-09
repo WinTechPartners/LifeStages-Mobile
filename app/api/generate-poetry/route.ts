@@ -1,10 +1,11 @@
+import { entitlementProfile } from '@/lib/entitlements'
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
 import { buildPersonalizationContext } from "@/lib/personalization-prompts"
 
 export async function POST(request: Request) {
   try {
-    const { verseReference, verseText, ageRange, gender, stageSituation, source, sermonTitle, sermonSummary } = await request.json()
+    const { verseReference, verseText, ageRange, gender, stageSituation, source, sermonTitle, sermonSummary } = await entitlementProfile(await request.json())
 
     // Determine if this is sermon-based or verse-based
     const isSermonMode = source === 'sermon' && sermonTitle

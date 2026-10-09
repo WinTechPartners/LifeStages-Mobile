@@ -1,9 +1,10 @@
+import { entitlementProfile } from '@/lib/entitlements'
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
 
 export async function POST(request: Request) {
   try {
-    const { topic, verseReference, verseText, ageRange = "adult", source, sermonTitle, sermonSummary } = await request.json()
+    const { topic, verseReference, verseText, ageRange = "adult", source, sermonTitle, sermonSummary } = await entitlementProfile(await request.json())
 
     const isSermonMode = source === 'sermon' && sermonTitle
 

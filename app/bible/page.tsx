@@ -51,7 +51,7 @@ export default function BiblePage() {
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null)
   const [verses, setVerses] = useState<Verse[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [translation, setTranslation] = useState("KJV")
+  const [translation, setTranslation] = useState("WEB")
   const [analyticsView, setAnalyticsView] = useState<{ id: string; scripture: AnalyticsScripture; sermonId?: string } | null>(null)
   const [chapterError, setChapterError] = useState("")
   const chapterRequest = useRef(0)
@@ -66,7 +66,7 @@ export default function BiblePage() {
       try {
         const parsed = JSON.parse(savedProfile)
         if (parsed.bibleTranslation) {
-          setTranslation(parsed.bibleTranslation)
+          setTranslation("WEB")
         }
       } catch (e) {
         console.error("Error loading translation preference:", e)
@@ -76,6 +76,7 @@ export default function BiblePage() {
   
   // Save translation preference when changed
   const handleTranslationChange = (newTranslation: string) => {
+    newTranslation = "WEB"
     setTranslation(newTranslation)
     // Save to profile
     const savedProfile = localStorage.getItem("userProfile")
@@ -158,9 +159,7 @@ export default function BiblePage() {
       const bookNumber = book.bookNumber || canonicalBooks.findIndex(item => item.id === book.id) + 1
       if (bookNumber > 0) setAnalyticsView({ id, scripture: { book: bookNumber, chapter, translation: requestedTranslation }, sermonId })
     } catch (error) {
-      if (requestId === chapterRequest.current) setChapterError(requestedTranslation === "NIV"
-        ? "NIV is unavailable from our Bible text provider. Please choose another translation above."
-        : "Could not load this chapter. Please try again.")
+      if (requestId === chapterRequest.current) setChapterError("Could not load this chapter. Please try again.")
     }
     if (requestId === chapterRequest.current) setIsLoading(false)
   }, [translation, booksData])
@@ -424,6 +423,7 @@ export default function BiblePage() {
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto pb-8 scroll-pt-4" ref={contentRef}>
+        <p className="px-4 pt-3 text-xs text-slate-300">World English Bible · More Bible translations are planned by the end of 2026.</p>
         {linkNotice && <p className="p-4 text-blue-100 text-sm" role="status">{linkNotice}</p>}
         {/* BOOKS VIEW */}
         {viewMode === "books" && (

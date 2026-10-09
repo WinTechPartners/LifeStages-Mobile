@@ -1,9 +1,11 @@
+import { webPassage, scheduledFallback } from '@/lib/web-scripture'
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
 
 export async function POST(request: Request) {
   try {
     const { source, verseQuery } = await request.json()
+    const verse = verseQuery ? await webPassage(verseQuery) : scheduledFallback(new Date().toISOString().slice(0,10))
 
     const openrouter = createOpenRouter({
       apiKey: process.env.OPENROUTER_API_KEY!,
@@ -27,13 +29,14 @@ export async function POST(request: Request) {
          If "Olive Tree", pick a verse focused on growth or nature.`
 
     const fullPrompt = `
-      ${prompt}
+      Use this verified World English Bible passage: ${JSON.stringify(verse)}. Create all sections about this passage.
+      Use this verified World English Bible passage: ${JSON.stringify(verse)}.
       
       The JSON schema MUST be:
       {
           "verse": {
             "reference": "Book Chapter:Verse",
-            "version": "NIV",
+            "version": "WEB",
             "text": "The verse text"
           },
           "interpretation": "A long, reflective interpretation following all persona rules. NO first-person. Focus on the core message, application, and relatable insights. At least 600 words long.",
@@ -84,7 +87,7 @@ export async function POST(request: Request) {
     const cleanJson = text.replace(/```json|```/g, "").trim()
     const data = JSON.parse(cleanJson)
 
-    return Response.json(data)
+    return Response.json({...data, verse})
   } catch (error) {
     console.error("Generation error:", error)
     return Response.json({ error: "Failed to generate devotional" }, { status: 500 })

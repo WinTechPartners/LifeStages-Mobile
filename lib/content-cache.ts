@@ -56,7 +56,7 @@ function ensureTable(): Promise<void> {
 }
 
 function normalize(parts: CacheKeyParts): string {
-  const out: Record<string, string> = {}
+  const out: Record<string, string> = { scripture_policy: "web-only-2026-v1" }
   for (const k of Object.keys(parts).sort()) {
     const v = parts[k]
     if (v === undefined || v === null || v === "") continue

@@ -223,7 +223,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
         if (response.ok) {
           const data = await response.json()
           if (data.reference && data.text) {
-            return { reference: data.reference, text: data.text, version: 'NIV' }
+            return { reference: data.reference, text: data.text, version: 'WEB' }
           }
         }
       } catch (e) {
@@ -322,7 +322,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
     }
     
     const profile = getFreshProfile()
-    const cacheKey = JSON.stringify(["access-v3", profile.personalized, "text-free-v3", source, profile.churchId, profile.ageRange, profile.gender, profile.stageSituation, profile.lifeCircumstances, profile.language, profile.contentStyle])
+    const cacheKey = JSON.stringify(["access-web-v1", profile.personalized, "text-free-v3", source, profile.churchId, profile.ageRange, profile.gender, profile.stageSituation, profile.lifeCircumstances, profile.language, profile.contentStyle])
     
     // If we already loaded this exact combination, skip
     if (lastLoadedKeyRef.current === cacheKey && devotional.verse) {

@@ -1,9 +1,11 @@
+import { webPassage } from '@/lib/web-scripture'
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
 
 export async function POST(req: Request) {
   try {
-    const { message, verseReference, verseText, history } = await req.json()
+    const { message, verseReference, history } = await req.json()
+    const verseText = (await webPassage(verseReference)).text
 
     const openrouter = createOpenRouter({
       apiKey: process.env.OPENROUTER_API_KEY!,

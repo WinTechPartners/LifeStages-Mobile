@@ -1,3 +1,4 @@
+import { webPassage } from './web-scripture'
 import { hasApplePremium } from './apple-iap-server'
 import { authorizedWarmup } from "./warmup-auth"
 import { normalizeLifeCircumstances } from "./life-circumstances"
@@ -19,6 +20,14 @@ export async function hasPremium(email: unknown): Promise<boolean> {
 
 /** Resolve paid access on the server before allowing any profile-based generation. */
 export async function entitlementProfile(input: Record<string, any>): Promise<Record<string, any>> {
+  const reference = input.verseReference || input.verse_reference || (input.selectedText ? input.reference : undefined)
+  if (reference) {
+    const passage = await webPassage(reference)
+    input = {...input, version:'WEB'}
+    if ('verseText' in input) input.verseText = passage.text
+    if ('verse_text' in input) input.verse_text = passage.text
+    if ('selectedText' in input && !passage.text.includes(input.selectedText)) input.selectedText = passage.text
+  }
   const email = input.email || input.profile?.email || input.userProfile?.email
   const supplied = typeof input.__warmupSecret === "string" ? input.__warmupSecret : ""
   const trustedWarmup = authorizedWarmup(supplied)

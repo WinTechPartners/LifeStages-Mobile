@@ -1,9 +1,10 @@
+import { entitlementProfile } from '@/lib/entitlements'
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
 
 export async function POST(request: Request) {
   try {
-    const { verseReference, verseText, ageRange, gender, stageSituation } = await request.json()
+    const { verseReference, verseText, ageRange, gender, stageSituation } = await entitlementProfile(await request.json())
 
     const openrouter = createOpenRouter({
       apiKey: process.env.OPENROUTER_API_KEY!,
