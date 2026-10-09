@@ -28,36 +28,6 @@ const nextConfig = {
           {key:'Access-Control-Allow-Methods',value:'GET, POST, OPTIONS'},
           {key:'Access-Control-Allow-Headers',value:'Content-Type, Authorization'}
         ]},
-        {source:'/api/:path*',headers:[
-          {key:'Access-Control-Allow-Origin',value:'capacitor://localhost'},
-          {key:'Access-Control-Allow-Methods',value:'GET, POST, OPTIONS'},
-          {key:'Access-Control-Allow-Headers',value:'Content-Type, Authorization'}
-        ]},
-        {source:'/api/:path*',headers:[
-          {key:'Access-Control-Allow-Origin',value:'capacitor://localhost'},
-          {key:'Access-Control-Allow-Methods',value:'GET, POST, OPTIONS'},
-          {key:'Access-Control-Allow-Headers',value:'Content-Type, Authorization'}
-        ]},
-        {source:'/api/:path*',headers:[
-          {key:'Access-Control-Allow-Origin',value:'capacitor://localhost'},
-          {key:'Access-Control-Allow-Methods',value:'GET, POST, OPTIONS'},
-          {key:'Access-Control-Allow-Headers',value:'Content-Type, Authorization'}
-        ]},
-        {source:'/api/:path*',headers:[
-          {key:'Access-Control-Allow-Origin',value:'capacitor://localhost'},
-          {key:'Access-Control-Allow-Methods',value:'GET, POST, OPTIONS'},
-          {key:'Access-Control-Allow-Headers',value:'Content-Type, Authorization'}
-        ]},
-        {source:'/api/:path*',headers:[
-          {key:'Access-Control-Allow-Origin',value:'capacitor://localhost'},
-          {key:'Access-Control-Allow-Methods',value:'GET, POST, OPTIONS'},
-          {key:'Access-Control-Allow-Headers',value:'Content-Type, Authorization'}
-        ]},
-        {source:'/api/:path*',headers:[
-          {key:'Access-Control-Allow-Origin',value:'capacitor://localhost'},
-          {key:'Access-Control-Allow-Methods',value:'GET, POST, OPTIONS'},
-          {key:'Access-Control-Allow-Headers',value:'Content-Type, Authorization'}
-        ]},
         {
           source: '/:path*',
           headers: [
