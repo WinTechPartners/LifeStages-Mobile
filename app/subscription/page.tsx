@@ -186,7 +186,7 @@ function SubscriptionContent() {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg text-red-300 text-sm">
+          <div role="alert" className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg text-red-300 text-sm">
             {error}
           </div>
         )}
@@ -290,10 +290,14 @@ function SubscriptionContent() {
               </div>
             </Card>
 
+            {!canStartTrial && !(selectedPlan === "annual" ? yearlyProduct : monthlyProduct) && (
+              <p role="status" className="text-sm text-amber-200">Apple has not loaded this plan yet. Tap Subscribe with Apple to retry.</p>
+            )}
+
             {/* CTA Button */}
             <button
               onClick={handleStartTrial}
-              disabled={purchasing || (!canStartTrial && !(selectedPlan === "annual" ? yearlyProduct : monthlyProduct))}
+              disabled={purchasing}
               className="w-full py-4 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 text-gray-900 rounded-xl font-bold text-lg shadow-xl active:scale-[0.98] transition-transform disabled:opacity-60"
             >
               {purchasing ? "Processing..." : canStartTrial ? "Start FREE 7-Day Trial" : "Subscribe with Apple"}

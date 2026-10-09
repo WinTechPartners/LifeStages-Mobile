@@ -47,7 +47,7 @@ export async function purchaseProduct(productId:string):Promise<boolean> {
   if (!known(productId)) throw Error('This subscription plan is unavailable.')
   if (!await initializeIAP()) throw Error('Apple billing is unavailable in this app build. Update LifeStages in TestFlight and try again.')
   // Prevent charging anyone before the hosted personalization verifier is configured.
-  const response=await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || ''}/api/apple/status`,{cache:'no-store'})
+  const response=await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || ''}/api/apple/status`,{cache:'no-store',signal:AbortSignal.timeout(15000)})
   if (!response.ok || !(await response.json()).configured) throw Error('Apple subscriptions are being set up. Please try again later.')
   const result=await store.purchase({productId})
   if (result.outcome==='cancelled') return false
