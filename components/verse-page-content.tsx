@@ -212,17 +212,18 @@ export default function VersePageContent() {
         {/* Find a Verse */}
         <div className="px-4 pb-4">
           <button
-            onClick={() => router.push("/selection")}
-            className="w-full flex items-center p-4 bg-gray-900/50 backdrop-blur rounded-xl border border-amber-400/30 transition-all active:scale-[0.98]"
+            disabled
+            aria-label="Find a Verse — Coming soon"
+            className="w-full flex items-center p-4 bg-gray-900/50 backdrop-blur rounded-xl border border-amber-400/20 opacity-60 cursor-not-allowed"
           >
             <div className="size-10 rounded-full bg-amber-500 text-white flex items-center justify-center mr-3">
               <span className="material-symbols-outlined">search</span>
             </div>
             <div className="flex-1 text-left">
               <span className="font-bold text-white block">Find a Verse</span>
-              <span className="text-xs text-blue-200/70 font-medium">Search any scripture by reference</span>
+              <span className="text-xs text-blue-200/70 font-medium">Coming soon</span>
             </div>
-            <span className="material-symbols-outlined text-amber-400">arrow_forward</span>
+            <span className="material-symbols-outlined text-amber-400">schedule</span>
           </button>
         </div>
 

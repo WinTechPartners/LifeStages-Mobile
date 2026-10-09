@@ -1,6 +1,7 @@
 "use client"
 
 
+import { openMusicLink } from "@/lib/external-links"
 import { apiFetch } from "@/lib/api-base"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useDevotional } from "@/context/devotional-context"
@@ -25,6 +26,7 @@ function SongsContent() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [searchError,setSearchError]=useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
 
   // Check if we're in sermon mode
   const isSermonMode = searchParams.get('source') === 'sermon'
@@ -143,15 +145,18 @@ function SongsContent() {
     }
   }
 
-  const copyAndOpenSuno = () => {
-    if (originalSong?.prompt) {
-      navigator.clipboard.writeText(originalSong.prompt)
-      window.open("https://suno.ai", "_blank")
-    }
+  const openSongLink = async (url: string) => {
+    setLinkError(null)
+    try { await openMusicLink(url) }
+    catch { setLinkError("Unable to open this music link. Please try again.") }
   }
 
-  const openSongLink = (url: string) => {
-    window.open(url, "_blank")
+  const copyAndOpenSuno = async () => {
+    if (originalSong?.prompt) {
+      try { await navigator.clipboard.writeText(originalSong.prompt) }
+      catch { setLinkError("Unable to copy the song prompt. Please copy it manually."); return }
+      await openSongLink("https://suno.ai")
+    }
   }
 
   return (
@@ -173,6 +178,7 @@ function SongsContent() {
 
       <div role="status">{searchError && <button onClick={()=>searchClassicSongs()}>Unable to load recommendations. Try again</button>}</div>
       <main className="flex-1 flex flex-col p-5 gap-5">
+        {linkError && <p role="alert" className="rounded-xl border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-100">{linkError}</p>}
         {/* Source Reference */}
         <div className="text-center">
           <p className="text-rose-400 font-medium text-sm">{sourceReference}</p>

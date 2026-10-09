@@ -3,6 +3,8 @@ require 'xcodeproj'
 require 'json'
 root = File.expand_path('..', __dir__)
 app = File.join(root, 'ios/App/App')
+native_config = JSON.parse(File.read(File.join(app, 'capacitor.config.json')))
+raise 'Native music link launcher missing from the Capacitor bridge' unless (native_config['packageClassList'] || []).include?('AppLauncherPlugin')
 project = Xcodeproj::Project.open(File.join(root, 'ios/App/App.xcodeproj'))
 group = project.main_group.find_subpath('App', false)
 target = project.targets.find { |t| t.name == 'App' }
