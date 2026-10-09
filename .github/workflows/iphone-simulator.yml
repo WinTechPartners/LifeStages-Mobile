@@ -56,6 +56,40 @@ jobs:
           xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios-simulator ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
           test -f build/ios-simulator/Build/Products/Release-iphonesimulator/App.app/Info.plist
           ditto -c -k --sequesterRsrc --keepParent build/ios-simulator/Build/Products/Release-iphonesimulator/App.app LifeStages-iPhone-Simulator.app.zip
+      - name: Launch the app and capture native startup evidence
+        timeout-minutes: 8
+        run: |
+          mkdir -p build/startup
+          xcrun simctl list devices available --json > build/startup/devices.json
+          device=$(python3 -c 'import json; d=json.load(open("build/startup/devices.json")); print(next(x["udid"] for runtime,items in d["devices"].items() if "iOS" in runtime for x in items if "iPhone" in x["name"]))')
+          xcrun simctl boot "$device" || true
+          xcrun simctl bootstatus "$device" -b
+          xcrun simctl install "$device" build/ios-simulator/Build/Products/Release-iphonesimulator/App.app
+          SIMCTL_CHILD_LIFESTAGES_STARTUP_PROBE=1 xcrun simctl launch --terminate-running-process --stdout="$PWD/build/startup/app.stdout" --stderr="$PWD/build/startup/app.stderr" "$device" com.bibleforlifestages
+          sleep 20
+          xcrun simctl io "$device" screenshot build/startup/home.png
+          xcrun simctl spawn "$device" log show --last 2m --style compact --predicate 'process == "App"' > build/startup/native.log
+          cat build/startup/app.stdout
+          cat build/startup/app.stderr
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          text = Path('build/startup/app.stdout').read_text()
+          marker = 'LIFESTAGES_STARTUP_PROBE: '
+          payload = next((line.split(marker, 1)[1] for line in text.splitlines() if marker in line), None)
+          if not payload: raise RuntimeError('No WebView startup response: inspect screenshot and native logs')
+          state = json.loads(payload)
+          Path('build/startup/webview.json').write_text(json.dumps(state, indent=2))
+          if 'Read the Bible' not in state['text']: raise RuntimeError('Home screen did not render: inspect captured WebView errors')
+          print('Native WebView rendered the LifeStages home screen.')
+          PY
+      - name: Save startup screenshot and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LifeStages-native-startup
+          path: build/startup/**
+
       - name: Upload Appetize-ready simulator build
         uses: actions/upload-artifact@v4
         with:
