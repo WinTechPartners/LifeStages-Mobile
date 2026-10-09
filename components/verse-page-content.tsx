@@ -16,7 +16,7 @@ import { track } from "@/lib/analytics/client"
 export default function VersePageContent() {
   const router = useRouter()
   const { devotional } = useDevotional()
-  const { canAccessCore, tier } = useSubscription()
+  const { canAccessCore, canAccessPremium, tier } = useSubscription()
   const { hasChurch, logo, church, isLoading: churchLoading } = useChurch()
   const [showLifelinesModal, setShowLifelinesModal] = useState(false)
 
@@ -43,7 +43,7 @@ export default function VersePageContent() {
 
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-md mx-auto bg-[#0c1929] shadow-2xl">
-      <Link href="/personalization" className="block px-6 pt-5 pr-16 text-sm text-amber-300 underline underline-offset-4">See examples of personalized Premium content</Link>
+      {!canAccessPremium && <Link href="/personalization" className="block px-6 pt-5 pr-16 text-sm text-amber-300 underline underline-offset-4">See examples of personalized Premium content</Link>}
       {/* Three Dots Menu */}
       <div className="absolute top-4 right-4 z-20">
         <HeaderDropdown verseReference={devotional.verse?.reference} />
@@ -132,7 +132,7 @@ export default function VersePageContent() {
             <>
               <div className="relative w-24 h-24 rounded-2xl overflow-hidden shadow-xl border-2 border-amber-400/30 mb-3">
                 <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-                  <source src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Book%20of%20Life%20-%20Christian%20-%20Video-uZ0vBJPjlZIbPlSRaiqQ0zfvwyuxsh.mp4" type="video/mp4" />
+                  <source src="/images/lifestages-book-of-life.mp4" type="video/mp4" />
                 </video>
               </div>
               <h1 className="text-xl font-bold tracking-tight text-white">Bible for Life Stages</h1>
@@ -201,8 +201,8 @@ export default function VersePageContent() {
                 <span className="material-symbols-outlined">forum</span>
               </div>
               <div className="flex-1 text-left">
-                <span className="font-bold text-gray-900 block">Text Chat — Premium</span>
-                <span className="text-xs text-indigo-600 font-medium">Voice Chat: Coming Soon — Premium Plus</span>
+                <span className="font-bold text-gray-900 block">Text Chat</span>
+
               </div>
               <span className="material-symbols-outlined text-gray-400">arrow_forward</span>
             </button>

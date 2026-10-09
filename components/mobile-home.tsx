@@ -166,7 +166,7 @@ export default function MobileHome() {
           ) : showChurchBranding ? (
             <span className="material-symbols-outlined text-3xl">church</span>
           ) : (
-            <AppImage src="/images/front-page-icon.jpg" alt="LifeStages" className="size-28 rounded-2xl object-cover" loading="eager" />
+            <video autoPlay loop muted playsInline aria-label="LifeStages tree of life and book" className="size-28 rounded-2xl object-cover"><source src="/images/lifestages-book-of-life.mp4" type="video/mp4" /></video>
           )}
           {/* BLOCK 2: Title */}
           <div className="min-w-0">
