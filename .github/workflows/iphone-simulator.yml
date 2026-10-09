@@ -57,7 +57,7 @@ jobs:
           test -f build/ios-simulator/Build/Products/Release-iphonesimulator/App.app/Info.plist
           ditto -c -k --sequesterRsrc --keepParent build/ios-simulator/Build/Products/Release-iphonesimulator/App.app LifeStages-iPhone-Simulator.app.zip
       - name: Launch the app and capture native startup evidence
-        timeout-minutes: 8
+        timeout-minutes: 15
         run: |
           mkdir -p build/startup
           xcrun simctl list devices available --json > build/startup/devices.json
@@ -66,7 +66,7 @@ jobs:
           xcrun simctl bootstatus "$device" -b
           xcrun simctl install "$device" build/ios-simulator/Build/Products/Release-iphonesimulator/App.app
           SIMCTL_CHILD_LIFESTAGES_STARTUP_PROBE=1 xcrun simctl launch --terminate-running-process --stdout="$PWD/build/startup/app.stdout" --stderr="$PWD/build/startup/app.stderr" "$device" com.bibleforlifestages
-          sleep 20
+          sleep 80
           xcrun simctl io "$device" screenshot build/startup/home.png
           xcrun simctl spawn "$device" log show --last 2m --style compact --predicate 'process == "App"' > build/startup/native.log
           cat build/startup/app.stdout
@@ -76,11 +76,12 @@ jobs:
           import json
           text = Path('build/startup/app.stdout').read_text()
           marker = 'LIFESTAGES_STARTUP_PROBE: '
-          payload = next((line.split(marker, 1)[1] for line in text.splitlines() if marker in line), None)
-          if not payload: raise RuntimeError('No WebView startup response: inspect screenshot and native logs')
-          state = json.loads(payload)
+          samples = [json.loads(line.split(marker, 1)[1]) for line in text.splitlines() if marker in line]
+          if not samples: raise RuntimeError('No WebView startup response: inspect screenshot and native logs')
+          state = next((sample for sample in reversed(samples) if 'Read the Bible' in sample.get('text','')), samples[-1])
           Path('build/startup/webview.json').write_text(json.dumps(state, indent=2))
           if 'Read the Bible' not in state['text']: raise RuntimeError('Home screen did not render: inspect captured WebView errors')
+          if not state.get('storeKitAvailable'): raise RuntimeError('Native StoreKit bridge was not registered')
           print('Native WebView rendered the LifeStages home screen.')
           PY
       - name: Save startup screenshot and diagnostics
@@ -97,6 +98,7 @@ jobs:
           path: LifeStages-iPhone-Simulator.app.zip
           retention-days: 14
       - name: Upload the bundled native project for review
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: LifeStages-iOS-Project

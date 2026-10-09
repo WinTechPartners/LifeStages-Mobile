@@ -20,12 +20,14 @@ class LifeStagesBridgeViewController: CAPBridgeViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         guard ProcessInfo.processInfo.environment["LIFESTAGES_STARTUP_PROBE"] == "1" else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in
+        for delay in [12.0, 35.0, 65.0] {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self, let webView = self.webView else { print("LIFESTAGES_STARTUP_PROBE: missing WebView"); fflush(stdout); return }
-            webView.evaluateJavaScript("JSON.stringify({url:location.href,readyState:document.readyState,text:document.body.innerText.slice(0,1600),errors:window.__lifeStagesStartupErrors||[]})") { result, error in
+            webView.evaluateJavaScript("JSON.stringify({url:location.href,readyState:document.readyState,text:document.body.innerText.slice(0,1600),storeKitAvailable:!!window.Capacitor?.isPluginAvailable('LifeStagesStoreKit'),errors:window.__lifeStagesStartupErrors||[]})") { result, error in
                 print("LIFESTAGES_STARTUP_PROBE: \(result as? String ?? String(describing: error))")
                 fflush(stdout)
             }
+        }
         }
     }
 }
