@@ -1,7 +1,8 @@
 "use client"
 
 import { apiFetch } from "../api-base"
-import { toAnalyticsAgeBand } from "../age-bands"
+import { resolveAgeDeclaration } from "../age-bands"
+import { normalizeLifeCircumstances } from "../life-circumstances"
 import { isAnalyticsUuid, validateAnalyticsEnvelope, type AnalyticsEnvelope, type AnalyticsEvent, type AnalyticsEventKind } from "./contract"
 
 const PREFS = "lifestages_analytics_consent_v1"
@@ -96,12 +97,18 @@ export function track(kind: AnalyticsEventKind, fields: Fields = {}) {
   const situations: Record<string, AnalyticsEnvelope["situation"]> = {
     General: "general", "New beginnings": "new_beginnings", Struggling: "struggling", Transitions: "transitions",
   }
-  const ageBand = toAnalyticsAgeBand(profile)
+  const age = resolveAgeDeclaration(profile)
+  const circumstances = profile.circumstanceTaxonomyVersion === 2 && Array.isArray(profile.lifeCircumstances)
+    ? normalizeLifeCircumstances(profile.lifeCircumstances) : undefined
+  const declarationTime = typeof profile.declarationsUpdatedAt === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(profile.declarationsUpdatedAt)
+    && Number.isFinite(Date.parse(profile.declarationsUpdatedAt)) && Date.parse(profile.declarationsUpdatedAt) <= Date.now() ? profile.declarationsUpdatedAt : undefined
   const situation = situations[String(profile.stageSituation)]
   const envelope: AnalyticsEnvelope = {
     version: 1, consentVersion: 1, consentedAt: pref.consentedAt,
     deviceId: pref.deviceId, churchId,
-    ...(ageBand ? { ageBand } : {}), ...(situation ? { situation } : {}),
+    ...(age ? { ageBand: age.value, ageTaxonomyVersion: age.taxonomyVersion } : {}), ...(situation ? { situation } : {}),
+    ...(circumstances ? { lifeCircumstances: circumstances, circumstanceTaxonomyVersion: 2 as const } : {}),
+    ...(declarationTime ? { declarationsUpdatedAt: declarationTime } : {}),
     events: [{ ...fields, id: uuid(), kind, occurredAt: new Date().toISOString(), sessionId } as AnalyticsEvent],
   }
   if (!validateAnalyticsEnvelope(envelope).ok) return

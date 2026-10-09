@@ -9,6 +9,7 @@ import { PRODUCT_IDS } from "@/lib/native-iap"
 function SubscriptionContent() {
   const router = useRouter()
   const {
+    canStartTrial,
     tier,
     isTrialActive,
     daysLeftInTrial,
@@ -47,13 +48,13 @@ function SubscriptionContent() {
   const yearlyProduct = products.find((p) => p.id === PRODUCT_IDS.YEARLY)
 
   const monthlyPrice = monthlyProduct?.price || "$4.99"
-  const yearlyPrice = yearlyProduct?.price || "$44.99"
+  const yearlyPrice = yearlyProduct?.price || "$49.99"
   const yearlyMonthly = yearlyProduct
     ? `$${(yearlyProduct.priceAmount / 12).toFixed(2)}`
-    : "$3.75"
+    : "$4.17"
 
   const premiumFeatures = [
-    { name: "7-day FREE trial", icon: "celebration", highlight: true },
+    { name: canStartTrial ? "7-day FREE trial" : "Personalized for your life", icon: "celebration", highlight: true },
     { name: "Personalized Stories", icon: "auto_stories", highlight: false },
     { name: "Inspiring Poetry & Hymns", icon: "edit_note", highlight: false },
     { name: "Visual Imagery & Symbols", icon: "image", highlight: false },
@@ -159,7 +160,7 @@ function SubscriptionContent() {
         {showSuccess && (
           <div className="mb-4 p-4 bg-green-500/20 border border-green-500/30 rounded-xl text-green-300 text-center">
             <span className="material-symbols-outlined text-3xl mb-2">celebration</span>
-            <p className="font-bold">Your 7-day free trial has started!</p>
+            <p className="font-bold">Your Premium personalization is ready!</p>
             <p className="text-sm text-green-200/70 mt-1">Enjoy all premium features.</p>
           </div>
         )}
@@ -174,7 +175,7 @@ function SubscriptionContent() {
             <div className="flex justify-center mt-4">
               <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-green-500/20 border border-green-500/30 text-green-400 text-sm font-semibold">
                 <span className="material-symbols-outlined !text-lg">check_circle</span>
-                7-Day Trial of Premium Personalization
+                {canStartTrial ? "7-Day Trial of Premium Personalization" : "Premium Personalization"}
               </span>
             </div>
           </div>
@@ -212,7 +213,7 @@ function SubscriptionContent() {
               >
                 Annual
                 <span className="absolute -top-2 -right-1 px-2 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded-full">
-                  SAVE 25%
+                  SAVE 16%
                 </span>
               </button>
             </div>
@@ -289,16 +290,16 @@ function SubscriptionContent() {
             {/* CTA Button */}
             <button
               onClick={handleStartTrial}
-              disabled={purchasing}
+              disabled={purchasing || (!canStartTrial && !(selectedPlan === "annual" ? yearlyProduct : monthlyProduct))}
               className="w-full py-4 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 text-gray-900 rounded-xl font-bold text-lg shadow-xl active:scale-[0.98] transition-transform disabled:opacity-60"
             >
-              {purchasing ? "Processing..." : "Start FREE 7-Day Trial"}
+              {purchasing ? "Processing..." : canStartTrial ? "Start FREE 7-Day Trial" : "Subscribe with Apple"}
             </button>
 
             <div className="flex items-center justify-center gap-4 text-xs">
               <span className="flex items-center gap-1 text-blue-200/60">
                 <span className="material-symbols-outlined text-sm">check_circle</span>
-                Payment through {typeof window !== "undefined" && /android/i.test(navigator.userAgent) ? "Google Play" : "App Store"}
+                Secure payment
               </span>
             </div>
 
@@ -309,7 +310,7 @@ function SubscriptionContent() {
               </span>
               <span className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">check_circle</span>
-                No charge for 7 days
+                {canStartTrial ? "No charge for 7 days" : "Apple confirms the price before purchase"}
               </span>
             </div>
 

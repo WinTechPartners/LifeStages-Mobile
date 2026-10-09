@@ -6,13 +6,21 @@ import { useLanguage } from "@/context/language-context"
 import { LanguageSelector } from "@/components/language-selector"
 import { useSubscription } from "@/context/subscription-context"
 import { ChurchCarePreferences } from "@/components/church-care-preferences"
-import { AGE_BANDS, LEGACY_AGE_LABELS, isAgeBand, isPersonalizationAgeRange, toPersonalizationAgeRange } from "@/lib/age-bands"
+import { AGE_BANDS, isAgeBand, isKnownAgeBand, isPersonalizationAgeRange, resolveAgeDeclaration, toPersonalizationAgeRange } from "@/lib/age-bands"
+import { CIRCUMSTANCE_GROUPS, LIFE_CIRCUMSTANCES, normalizeLifeCircumstances, recordDeclarationChange, type LifeCircumstanceId, type DeclarationSnapshot } from "@/lib/life-circumstances"
 
 interface ProfileData {
   fullName: string
   email: string
   ageRange: string
   ageBand: string
+  ageTaxonomyVersion?: number
+  ageDeclaredAt?: string
+  lifeCircumstances: LifeCircumstanceId[]
+  circumstanceTaxonomyVersion?: number
+  circumstancesDeclaredAt?: string
+  declarationsUpdatedAt?: string
+  declarationHistory?: DeclarationSnapshot[]
   gender: string
   stageSituation: string
   contentStyle: "casual" | "academic"
@@ -23,15 +31,17 @@ interface ProfileData {
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { t } = useLanguage()
-  const { canAccessCore } = useSubscription()
+  const { t, language } = useLanguage()
+  const { canAccessPremium } = useSubscription()
+  const vi = language === "vi"
   const [formData, setFormData] = useState<ProfileData>({
     fullName: "",
     email: "",
     ageRange: "",
     ageBand: "",
+    lifeCircumstances: [],
     gender: "",
-    stageSituation: "General",
+    stageSituation: "",
     contentStyle: "casual",
     churchId: "",
     country: "",
@@ -48,10 +58,17 @@ export default function ProfilePage() {
       setFormData({
         fullName: parsed.fullName || "",
         email: parsed.email || "",
-        ageRange: toPersonalizationAgeRange(parsed) || "",
-        ageBand: isAgeBand(parsed.ageBand) ? parsed.ageBand : "",
+        ageRange: isPersonalizationAgeRange(parsed.ageRange) ? parsed.ageRange : "",
+        ageBand: isKnownAgeBand(parsed.ageBand) ? parsed.ageBand : "",
+        ageTaxonomyVersion: parsed.ageTaxonomyVersion,
+        ageDeclaredAt: parsed.ageDeclaredAt,
+        lifeCircumstances: normalizeLifeCircumstances(parsed.lifeCircumstances),
+        circumstanceTaxonomyVersion: parsed.circumstanceTaxonomyVersion,
+        circumstancesDeclaredAt: parsed.circumstancesDeclaredAt,
+        declarationsUpdatedAt: parsed.declarationsUpdatedAt,
+        declarationHistory: parsed.declarationHistory,
         gender: parsed.gender || "",
-        stageSituation: parsed.stageSituation || "General",
+        stageSituation: parsed.stageSituation || "",
         contentStyle: parsed.contentStyle || "casual",
         churchId: parsed.churchId || "",
         country: parsed.country || "",
@@ -61,27 +78,40 @@ export default function ProfilePage() {
   }, [])
 
   // Save to localStorage whenever data changes
-  const handleChange = (field: keyof ProfileData, value: string) => {
-    const updated = { ...formData, [field]: value }
-    if (field === "ageBand") updated.ageRange = toPersonalizationAgeRange(updated) || ""
-    setFormData(updated)
+  const persistChanges = (changes: Partial<ProfileData>, kind?: "age" | "circumstances") => {
     let stored: Record<string, unknown> = {}
     try {
       const parsed = JSON.parse(localStorage.getItem("userProfile") || "{}")
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) stored = parsed
     } catch { /* Replace an unreadable profile with the user's current selections. */ }
-    localStorage.setItem("userProfile", JSON.stringify({ ...stored, ...updated }))
-    window.dispatchEvent(new Event('profile-updated'))
+    const next = { ...stored, ...formData, ...changes }
+    const updated = kind ? recordDeclarationChange(stored, next, kind) : next
+    localStorage.setItem("userProfile", JSON.stringify(updated))
+    setFormData(updated)
     window.dispatchEvent(new Event("lifestages-profile-changed"))
   }
+
+  const handleChange = (field: "fullName" | "email" | "ageBand" | "gender" | "contentStyle" | "churchId" | "country" | "bibleTranslation", value: string) => {
+    if (field === "ageBand") {
+      if (value === "__legacy" || (value !== "" && !isAgeBand(value))) return
+      persistChanges({ ageBand: value, ageRange: value ? toPersonalizationAgeRange({ ...formData, ageBand: value }) || "" : "" }, "age")
+    } else if (field === "contentStyle") {
+      if (value === "casual" || value === "academic") persistChanges({ contentStyle: value })
+    } else persistChanges({ [field]: value })
+  }
+  const toggleCircumstance = (id: LifeCircumstanceId) => {
+    const next = formData.lifeCircumstances.includes(id) ? formData.lifeCircumstances.filter(item => item !== id) : [...formData.lifeCircumstances, id]
+    persistChanges({ lifeCircumstances: normalizeLifeCircumstances(next) }, "circumstances")
+  }
+  const ageDeclaration = resolveAgeDeclaration(formData)
 
   const handleSave = () => {
     router.push("/")
   }
 
   const handleLogout = () => {
-    localStorage.removeItem("userProfile")
     localStorage.removeItem("bible_user_email")
+    localStorage.removeItem("userProfile")
     window.dispatchEvent(new Event("lifestages-profile-changed"))
     localStorage.removeItem("selectedLanguage")
     // Clear any cached devotionals
@@ -122,14 +152,6 @@ export default function ProfilePage() {
     { value: "JP", label: "Japan" },
     { value: "VN", label: "Vietnam" },
     { value: "OTHER", label: "Other" },
-  ]
-
-  // Simplified to 4 core situations
-  const coreSituations = [
-    { value: "General", label: "General", icon: "sunny", desc: "Everyday faith journey" },
-    { value: "New beginnings", label: "New Beginnings", icon: "rocket_launch", desc: "Marriage, baby, new job, moving" },
-    { value: "Struggling", label: "Struggling", icon: "heart_broken", desc: "Health, finances, loneliness, loss" },
-    { value: "Transitions", label: "Transitions", icon: "sync_alt", desc: "Empty nest, retirement, divorce" },
   ]
 
   return (
@@ -184,6 +206,19 @@ export default function ProfilePage() {
           />
         </label>
 
+        {/* Age Range */}
+        <fieldset className="w-full" aria-label={vi ? "Khoảng tuổi" : "Age range"}>
+          <legend className="mb-2 text-sm font-medium">{t("ageRange")} <span className="text-muted-foreground font-normal">{vi ? "(không bắt buộc)" : "(optional)"}</span></legend>
+          <div className="grid grid-cols-4 gap-2">
+            {AGE_BANDS.map(range => <button key={range} type="button" aria-pressed={formData.ageBand === range} onClick={() => handleChange("ageBand", range)}
+              className={"min-h-12 rounded-xl border px-2 py-3 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary " + (formData.ageBand === range ? "border-primary bg-primary/15 text-primary" : "border-border bg-card text-foreground hover:border-primary/50")}>
+              {range.replace("-", "–")}
+            </button>)}
+          </div>
+          <button type="button" aria-pressed={!ageDeclaration} onClick={() => handleChange("ageBand", "")} className={"mt-2 min-h-11 rounded-xl border px-3 py-2 text-sm " + (!ageDeclaration ? "border-primary text-primary bg-primary/10" : "border-border text-muted-foreground")}>{vi ? "Không muốn chia sẻ" : "Prefer not to share"}</button>
+          {ageDeclaration?.legacy && <p className="mt-2 text-xs text-muted-foreground">{vi ? "Khoảng tuổi đã lưu là " + ageDeclaration.label + ". Bạn có thể giữ nguyên hoặc tự chọn khoảng mới." : "Your saved range is " + ageDeclaration.label + ". Keep it or choose a new range yourself."}</p>}
+        </fieldset>
+
         {/* Country Select */}
         <label className="flex flex-col gap-1.5 w-full">
           <p className="text-sm font-medium leading-normal">Country <span className="text-muted-foreground font-normal">(optional)</span></p>
@@ -224,35 +259,6 @@ export default function ProfilePage() {
 
           <ChurchCarePreferences />
 
-        {/* Age Range */}
-        <label className="flex flex-col gap-1.5 w-full">
-          <p className="text-sm font-medium leading-normal">{t("ageRange")} <span className="text-muted-foreground font-normal">(optional)</span></p>
-          <div className="relative">
-            <select
-              value={formData.ageBand}
-              onChange={(e) => handleChange("ageBand", e.target.value)}
-              className="flex w-full resize-none overflow-hidden rounded-xl focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-border bg-card h-14 px-4 text-base font-normal leading-normal shadow-sm appearance-none transition-all"
-            >
-              <option value="">
-                {formData.ageRange ? "Keep my existing range" : "Select your age range (optional)"}
-              </option>
-              {AGE_BANDS.map((range) => (
-                <option key={range} value={range}>
-                  {range.replace("-", "–")}
-                </option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
-              <span className="material-symbols-outlined">expand_more</span>
-            </div>
-          </div>
-          {!formData.ageBand && isPersonalizationAgeRange(formData.ageRange) && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Your saved range is {LEGACY_AGE_LABELS[formData.ageRange]}. You can keep it or choose a more specific range above.
-            </p>
-          )}
-        </label>
-
         {/* Gender Selection */}
         <div className="pt-2">
           <div className="flex items-center gap-2 mb-3">
@@ -291,56 +297,46 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Life Stage - 4 Core Situations */}
-        <div className="pt-2">
+        {/* Explicit circumstances may overlap; age never chooses them. */}
+        <section className="pt-2" aria-labelledby="circumstances-heading">
           <div className="flex items-center gap-2 mb-3">
             <span className="material-symbols-outlined text-primary">spa</span>
-            <h3 className="text-lg font-bold leading-tight">Life Stage</h3>
+            <h3 id="circumstances-heading" className="text-lg font-bold leading-tight">{vi ? "Hoàn cảnh hiện tại" : "Life circumstances"}</h3>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
-            Where are you in your journey right now?
+            {vi ? "Không bắt buộc. Chọn tất cả điều phù hợp với bạn lúc này. Các lựa chọn có thể trùng nhau; độ tuổi không quyết định hoàn cảnh của bạn." : "Optional. Select everything that fits your life right now. Choices can overlap; your age does not determine your circumstances."}
           </p>
           
-          <div className="grid grid-cols-2 gap-3">
-            {coreSituations.map((situation) => (
-              <button
-                key={situation.value}
-                onClick={() => handleChange("stageSituation", situation.value)}
-                className={`flex flex-col items-start p-4 rounded-xl border transition-all ${
-                  formData.stageSituation === situation.value
-                    ? "border-primary bg-primary/10 shadow-md"
-                    : "border-border bg-card hover:border-primary/50"
-                }`}
-              >
-                <div className={`size-10 rounded-full flex items-center justify-center mb-2 ${
-                  formData.stageSituation === situation.value
-                    ? "bg-primary text-white"
-                    : "bg-muted text-muted-foreground"
-                }`}>
-                  <span className="material-symbols-outlined">{situation.icon}</span>
+          <div className="space-y-5">
+            {CIRCUMSTANCE_GROUPS.map(group => (
+              <fieldset key={group.id}>
+                <legend className="text-sm font-semibold mb-2">{vi ? group.labelVi : group.label}</legend>
+                <div className="flex flex-wrap gap-2">
+                  {LIFE_CIRCUMSTANCES.filter(item => item.group === group.id).map(item => {
+                    const selected = formData.lifeCircumstances.includes(item.id)
+                    return <button key={item.id} type="button" aria-pressed={selected} onClick={() => toggleCircumstance(item.id)}
+                      className={`min-h-11 px-3 py-2 rounded-xl text-sm border transition-colors ${selected ? "border-primary bg-primary/15 text-primary" : "border-border bg-card hover:border-primary/50"}`}>
+                      {selected && <span aria-hidden="true" className="mr-1">✓</span>}{vi ? item.labelVi : item.label}
+                    </button>
+                  })}
                 </div>
-                <span className={`font-semibold text-sm ${
-                  formData.stageSituation === situation.value ? "text-primary" : "text-foreground"
-                }`}>
-                  {situation.label}
-                </span>
-                <span className="text-xs text-muted-foreground mt-0.5">
-                  {situation.desc}
-                </span>
-              </button>
+              </fieldset>
             ))}
           </div>
-        </div>
+          {formData.lifeCircumstances.length > 0 && <button type="button" className="text-sm text-muted-foreground underline mt-4" onClick={() => persistChanges({ lifeCircumstances: [] }, "circumstances")}>{vi ? "Bỏ tất cả lựa chọn" : "Clear selections"}</button>}
+          {formData.stageSituation && <p className="text-xs text-muted-foreground mt-4">
+            {vi ? `Câu trả lời trước đây: “${formData.stageSituation}”. Được giữ riêng; không tự chuyển thành các lựa chọn ở trên.` : `Earlier broad response: “${formData.stageSituation}”. Kept separately; it does not select any circumstances above.`}
+          </p>}
+        </section>
 
-        {/* Content Style Toggle - Paid Users Only */}
-        {canAccessCore && (
+        {/* Preferences may be saved by anyone; verified paid plans apply personalization. */}
           <div className="pt-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="material-symbols-outlined text-primary">style</span>
-              <h3 className="text-lg font-bold leading-tight">Content Style</h3>
+              <h3 className="text-lg font-bold leading-tight">{vi ? "Phong cách nội dung" : "Content style"}</h3>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              How would you like your devotional content written?
+              {vi ? "Bạn muốn nội dung suy ngẫm được viết theo phong cách nào?" : "How would you like your devotional content written?"}
             </p>
             
             <div className="grid grid-cols-2 gap-3">
@@ -362,10 +358,10 @@ export default function ProfilePage() {
                 <span className={`font-semibold text-sm ${
                   formData.contentStyle === "casual" ? "text-primary" : "text-foreground"
                 }`}>
-                  Casual
+                  {vi ? "Gần gũi" : "Casual"}
                 </span>
                 <span className="text-xs text-muted-foreground mt-0.5">
-                  Warm, conversational, like a friend
+                  {vi ? "Ấm áp, tự nhiên như một người bạn" : "Warm, conversational, like a friend"}
                 </span>
               </button>
 
@@ -387,15 +383,19 @@ export default function ProfilePage() {
                 <span className={`font-semibold text-sm ${
                   formData.contentStyle === "academic" ? "text-primary" : "text-foreground"
                 }`}>
-                  Academic
+                  {vi ? "Học thuật" : "Academic"}
                 </span>
                 <span className="text-xs text-muted-foreground mt-0.5">
-                  Scholarly, in-depth, theological
+                  {vi ? "Chuyên sâu về học thuật và thần học" : "Scholarly, in-depth, theological"}
                 </span>
               </button>
             </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              {canAccessPremium
+                ? (vi ? "Gói trả phí của bạn có thể dùng những lựa chọn này để cá nhân hóa nội dung." : "Your paid plan can use these preferences to personalize content.")
+                : (vi ? "Bạn có thể lưu tùy chọn ngay bây giờ. Nội dung miễn phí dùng một phiên bản chung; cá nhân hóa được áp dụng khi có gói trả phí." : "Save your preferences now. Free content uses a shared edition; personalization applies with a paid plan.")}
+            </p>
           </div>
-        )}
 
         {/* Lifelines Info - FIXED: Dark background with light text */}
         <div className="pt-4 rounded-xl border border-primary/30 bg-primary/10 p-4">

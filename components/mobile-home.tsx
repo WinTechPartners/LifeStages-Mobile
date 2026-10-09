@@ -1,4 +1,5 @@
 "use client"
+import Link from "next/link"
 import { AppImage } from "@/components/app-image"
 
 import { useEffect, useState } from "react"
@@ -21,7 +22,7 @@ export default function MobileHome() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { devotional, userName, isLoading, loadingStates, generateDevotional } = useDevotional()
-  const { canAccessPremium } = useSubscription()
+  const { canAccessPremium, canStartTrial } = useSubscription()
   const { t, language } = useLanguage()
   const { hasChurch, church, lastSermon, thisSermon, logo, showSermonRow, isLoading: churchLoading } = useChurch()
   const [hasGenerated, setHasGenerated] = useState(false)
@@ -113,11 +114,11 @@ export default function MobileHome() {
 
   // Auto-generate verse
   useEffect(() => {
-    if (!devotional.verse && !isLoading && !hasGenerated && networkOnline) {
+    if (!churchLoading && !devotional.verse && !isLoading && !hasGenerated && networkOnline) {
       setHasGenerated(true)
       generateDevotional("YouVersion")
     }
-  }, [devotional.verse, isLoading, hasGenerated, generateDevotional, networkOnline])
+  }, [churchLoading, devotional.verse, isLoading, hasGenerated, generateDevotional, networkOnline])
 
   // Cache verse for offline access when new verse loads
   useEffect(() => {
@@ -158,29 +159,25 @@ export default function MobileHome() {
       {/* ========================================================
           BLOCK 1 & 2: Logo + Title (Generic or Church)
           ======================================================== */}
-      <header className="church-brand-surface sticky top-0 z-50 flex items-center justify-between px-4 py-3 backdrop-blur-xl border-b border-white/5">
-        <div className="flex min-w-0 items-center gap-3">
+      <header className="church-brand-surface relative z-30 flex flex-col items-center px-4 pt-16 pb-5 backdrop-blur-xl border-b border-white/5">
+        <div className="flex min-w-0 flex-col items-center gap-3 text-center">
           {/* BLOCK 1: Logo */}
           {showChurchBranding && logo ? (
-            <AppImage src={logo} alt="" className="h-9 max-w-20 object-contain" />
+            <AppImage src={logo} alt="" className="h-24 max-w-48 object-contain" />
           ) : showChurchBranding ? (
             <span className="material-symbols-outlined text-3xl">church</span>
           ) : (
-            <div className="relative w-9 h-9 rounded-xl overflow-hidden border border-amber-400/30">
-              <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-                <source src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Book%20of%20Life%20-%20Christian%20-%20Video-uZ0vBJPjlZIbPlSRaiqQ0zfvwyuxsh.mp4" type="video/mp4" />
-              </video>
-            </div>
+            <AppImage src="/images/front-page-icon.jpg" alt="LifeStages" className="size-28 rounded-2xl object-cover" loading="eager" />
           )}
           {/* BLOCK 2: Title */}
           <div className="min-w-0">
-            <h1 className="text-base font-bold leading-tight break-words">
+            <h1 className="text-2xl font-bold leading-tight break-words">
               {showChurchBranding && church ? church.name : "LifeStages"}
             </h1>
             <p className="text-[10px] opacity-70 font-medium tracking-wide">{showChurchBranding ? "POWERED BY LIFESTAGES" : "BIBLE FOR LIFE STAGES"}</p>
           </div>
         </div>
-        <div className="flex items-center gap-1"><LanguageSelector /><HeaderDropdown verseReference={devotional.verse?.reference} /></div>
+        <div className="absolute top-3 right-4 flex items-center gap-1"><LanguageSelector /><HeaderDropdown verseReference={devotional.verse?.reference} /></div>
       </header>
 
       {/* Scrollable Content */}
@@ -373,7 +370,7 @@ export default function MobileHome() {
                     <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">Premium</span>
                   </div>
                   <h3 className="text-xl font-bold text-white">Premium Makes It Personal</h3>
-                  <p className="text-sm text-blue-200/70 mt-1">Free: Bible reading, verse of the day, and Friendly Breakdown. With email: explanations and all Lifelines. Premium personalizes content to your age, gender, and life stage.</p>
+                  <Link href="/personalization" className="mt-2 block text-sm text-amber-300 underline underline-offset-4">See examples of personalized Premium content</Link>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 mb-5">
@@ -400,8 +397,8 @@ export default function MobileHome() {
                       <p className="text-xs text-blue-200/60">Personalized breakdowns, Lifelines, all content, and Text Chat</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-amber-400">$5<span className="text-sm text-blue-200/60">/mo</span></p>
-                      <p className="text-xs text-green-400">or $45/year (save 25%)</p>
+                      <p className="text-2xl font-bold text-amber-400">$4.99<span className="text-sm text-blue-200/60">/mo</span></p>
+                      <p className="text-xs text-green-400">or $49.99/year (save 16%)</p>
                     </div>
                   </div>
                 </div>
@@ -410,12 +407,12 @@ export default function MobileHome() {
                   onClick={() => { hapticTap(); router.push("/subscription") }}
                   className="w-full py-4 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 text-gray-900 rounded-xl font-bold text-lg shadow-xl active:scale-[0.98] transition-transform animate-pulse hover:animate-none"
                 >
-                  Try Personalization Free for 7 Days
+                  {canStartTrial ? "Try Personalization Free for 7 Days" : "Make It Personal with Premium"}
                 </button>
                 <div className="flex items-center justify-center gap-4 mt-3">
                   <span className="flex items-center gap-1 text-xs text-green-400">
                     <span className="material-symbols-outlined text-sm">check_circle</span>
-                    Free for 7 days
+                    {canStartTrial ? "Free for 7 days" : "Choose monthly or yearly"}
                   </span>
                   <span className="flex items-center gap-1 text-xs text-green-400">
                     <span className="material-symbols-outlined text-sm">check_circle</span>

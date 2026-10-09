@@ -1,3 +1,4 @@
+import { getAppleTransaction } from './native-iap'
 /**
  * API Base URL resolver for mobile vs web builds.
  * 
@@ -29,7 +30,7 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
     try {
       const body = JSON.parse(init.body)
       const profile = JSON.parse(localStorage.getItem('userProfile') || '{}')
-      request = { ...init, body: JSON.stringify({ profile, ...body, email: profile.email || localStorage.getItem('bible_user_email') }) }
+      request = { ...init, body: JSON.stringify({ profile, ...body, appleTransaction: getAppleTransaction() || undefined, email: profile.email || localStorage.getItem('bible_user_email') }) }
     } catch { /* Non-JSON requests pass through. */ }
   }
   return fetch(apiUrl(path), request)

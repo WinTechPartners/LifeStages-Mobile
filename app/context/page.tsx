@@ -138,7 +138,7 @@ function ContextContent() {
           <div
             className="h-full w-full bg-cover bg-center"
             style={{
-              backgroundImage: `url('${devotional.contextHeroImage || "/ancient-jerusalem-historical-scene.jpg"}')`,
+              backgroundImage: `url('${devotional.contextHeroImage || ""}')`,
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0c1929] via-[#0c1929]/70 to-transparent"></div>

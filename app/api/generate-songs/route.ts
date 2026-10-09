@@ -1,14 +1,16 @@
+import { entitlementProfile, hasPremium } from '@/lib/entitlements'
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
+import { culturalInstruction } from "@/lib/cultural-context"
+import { cacheGet, cacheSet } from "@/lib/content-cache"
+import { normalizeProfile, policyKey, readerInstruction } from "@/lib/content-policy"
 
 export async function POST(request: Request) {
   try {
-    const { verseReference, verseText, ageRange, language = "en", source, sermonTitle, sermonSummary } = await request.json()
-
-    // Determine if this is sermon-based or verse-based
-    const isSermonMode = source === 'sermon' && sermonTitle
-    const contentReference = isSermonMode ? `the sermon "${sermonTitle}"` : verseReference
-    const contentText = isSermonMode ? sermonSummary : verseText
+    const body = await entitlementProfile(await request.json())
+    const { verseReference, verseText } = body
+    const p = normalizeProfile(body)
+    const { language, ageRange } = p
 
     const openrouter = createOpenRouter({
       apiKey: process.env.OPENROUTER_API_KEY!,
@@ -41,9 +43,14 @@ Lyrics: Wisdom, gratitude, peace in the journey`,
 
     const style = styleGuide[ageRange] || styleGuide.adult
     const langNote = language !== "en" ? ` Write lyrics in ${getLanguageName(language)}.` : ""
+    const cultural = (await culturalInstruction(language)) + readerInstruction(p)
+    const cacheKey = policyKey(p, { verse: verseReference })
+    const hit = await cacheGet("songs", cacheKey)
+    if (hit) return Response.json(hit)
 
     const { text } = await generateText({
       model: openrouter(modelId),
+      abortSignal: AbortSignal.timeout(35000),
       system: `You're a professional songwriter writing for mainstream artists. Your songs get radio play - they're catchy, emotional, and well-crafted.
 
 ${style}
@@ -57,10 +64,10 @@ SONGWRITING RULES:
 - Chorus releases with emotional punch
 - Bridge offers a twist or deeper moment
 - Professional structure: Verse/Pre/Chorus/Verse/Pre/Chorus/Bridge/Chorus
-- 3-4 minute song length when performed${langNote}
+- 3-4 minute song length when performed${langNote}${cultural}
 
 The spiritual truth should be woven in naturally - not preachy, just real. Think "Viva La Vida" not "Amazing Grace."`,
-      prompt: `Write a radio-ready song inspired by ${contentReference}: "${contentText}"
+      prompt: `Write a radio-ready song inspired by ${verseReference}: "${verseText}"
 
 TITLE===
 [Catchy, intriguing title - could chart]
@@ -105,36 +112,17 @@ IMAGE_PROMPT===
       maxOutputTokens: 1800,
     })
 
-    // Strip markdown fences if the model wrapped its response
-    const cleaned = text.replace(/```[\w]*\n?/g, "").trim()
-
-    const titleMatch = cleaned.match(/TITLE===\s*([\s\S]*?)\s*===TITLE/)
-    const subtitleMatch = cleaned.match(/SUBTITLE===\s*([\s\S]*?)\s*===SUBTITLE/)
-    const lyricsMatch = cleaned.match(/LYRICS===\s*([\s\S]*?)\s*===LYRICS/)
-    const audioMatch = cleaned.match(/AUDIO_PROMPT===\s*([\s\S]*?)\s*===AUDIO_PROMPT/)
-    const imageMatch = cleaned.match(/IMAGE_PROMPT===\s*([\s\S]*?)\s*===IMAGE_PROMPT/)
+    const titleMatch = text.match(/TITLE===\s*([\s\S]*?)\s*===TITLE/)
+    const subtitleMatch = text.match(/SUBTITLE===\s*([\s\S]*?)\s*===SUBTITLE/)
+    const lyricsMatch = text.match(/LYRICS===\s*([\s\S]*?)\s*===LYRICS/)
+    const audioMatch = text.match(/AUDIO_PROMPT===\s*([\s\S]*?)\s*===AUDIO_PROMPT/)
+    const imageMatch = text.match(/IMAGE_PROMPT===\s*([\s\S]*?)\s*===IMAGE_PROMPT/)
 
     if (!titleMatch || !lyricsMatch) {
-      // Log the raw response so we can see what the model actually returned
-      console.error("Failed to parse song. Raw LLM response:", text.substring(0, 500))
-      
-      // Fallback: try to extract something useful even if delimiters are off
-      const lines = cleaned.split("\n").filter(l => l.trim())
-      const fallbackTitle = lines[0]?.replace(/^#+\s*/, "").replace(/\*+/g, "").trim() || "Untitled Song"
-      const fallbackLyrics = lines.slice(1).join("\n").trim() || "Lyrics could not be generated. Please try again."
-      
-      return Response.json({
-        songs: {
-          title: fallbackTitle,
-          sub: "Contemporary Pop",
-          lyrics: fallbackLyrics,
-          prompt: "uplifting pop song, professional production",
-          imagePrompt: "modern album art, cinematic, atmospheric",
-        }
-      })
+      throw new Error("Failed to parse song")
     }
 
-    return Response.json({
+    const result = {
       songs: {
         title: titleMatch[1].trim(),
         sub: subtitleMatch?.[1]?.trim() || "Contemporary Pop",
@@ -142,7 +130,9 @@ IMAGE_PROMPT===
         prompt: audioMatch?.[1]?.trim() || "uplifting pop song, professional production",
         imagePrompt: imageMatch?.[1]?.trim() || "modern album art, cinematic, atmospheric",
       }
-    })
+    }
+    await cacheSet("songs", cacheKey, result)
+    return Response.json(result)
   } catch (error) {
     console.error("Songs error:", error)
     return Response.json({ error: "Failed to generate songs" }, { status: 500 })

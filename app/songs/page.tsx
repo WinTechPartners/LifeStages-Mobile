@@ -24,6 +24,7 @@ function SongsContent() {
   const [classicSongs, setClassicSongs] = useState<any[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
+  const [searchError,setSearchError]=useState(false)
 
   // Check if we're in sermon mode
   const isSermonMode = searchParams.get('source') === 'sermon'
@@ -44,10 +45,10 @@ function SongsContent() {
 
   // Search for classic songs
   useEffect(() => {
-    if (songType === "classics" && classicSongs.length === 0 && !isSearching) {
+    if (sourceReference && songType === "classics" && classicSongs.length === 0 && !isSearching) {
       searchClassicSongs()
     }
-  }, [songType])
+  }, [songType, sourceReference, language])
 
   // Generate original song when in sermon mode
   useEffect(() => {
@@ -58,6 +59,7 @@ function SongsContent() {
 
   const searchClassicSongs = async () => {
     setIsSearching(true)
+    setSearchError(false)
     try {
       const searchTerm = isSermonMode ? sermonTitle : (devotional.verse?.reference || "faith hope")
       const cacheKey = scopedCache('classic_songs')
@@ -84,12 +86,14 @@ function SongsContent() {
         }),
       })
 
+      if (!response.ok) throw new Error("Source catalog unavailable")
       if (response.ok) {
         const data = await response.json()
         setClassicSongs(data.songs || [])
         localStorage.setItem(cacheKey, JSON.stringify({ songs: data.songs }))
       }
     } catch (error) {
+      setSearchError(true)
       console.error("Error searching classic songs:", error)
     } finally {
       setIsSearching(false)
@@ -167,6 +171,7 @@ function SongsContent() {
         <HeaderDropdown verseReference={sourceReference} />
       </header>
 
+      <div role="status">{searchError && <button onClick={()=>searchClassicSongs()}>Unable to load recommendations. Try again</button>}</div>
       <main className="flex-1 flex flex-col p-5 gap-5">
         {/* Source Reference */}
         <div className="text-center">

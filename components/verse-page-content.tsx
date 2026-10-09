@@ -1,4 +1,5 @@
 "use client"
+import Link from "next/link"
 import { AppImage } from "@/components/app-image"
 
 import { useState } from "react"
@@ -42,7 +43,7 @@ export default function VersePageContent() {
 
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-md mx-auto bg-[#0c1929] shadow-2xl">
-      <p className="px-6 pt-5 pr-16 text-sm text-blue-200">Generic content is free with email. Premium personalizes everything.</p>
+      <Link href="/personalization" className="block px-6 pt-5 pr-16 text-sm text-amber-300 underline underline-offset-4">See examples of personalized Premium content</Link>
       {/* Three Dots Menu */}
       <div className="absolute top-4 right-4 z-20">
         <HeaderDropdown verseReference={devotional.verse?.reference} />

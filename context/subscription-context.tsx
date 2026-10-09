@@ -2,8 +2,10 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from "react"
 import { apiFetch } from "@/lib/api-base"
-import { isNative } from "@/lib/native-features"
+import { isNative, getPlatform } from "@/lib/native-features"
 import {
+  listenForSubscriptionChanges,
+  manageAppleSubscriptions,
   initializeIAP,
   getProducts,
   purchaseProduct,
@@ -90,6 +92,8 @@ function isNewWeek(lastDate: string, currentDate: string): boolean {
 }
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
+  const [isNativeApp, setIsNativeApp] = useState(false)
+  useEffect(() => { setIsNativeApp(isNative()) }, [])
   const [userEmail, setUserEmailState] = useState<string | null>(null)
   const [subscriptionInfo, setSubscriptionInfo] = useState<IAPSubscriptionInfo>({
     status: "none",
@@ -164,6 +168,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    if (isNative()) return
     if (!userEmail) {
       if (!isNative()) setSubscriptionInfo({status:'none',productId:null,expiresAt:null,isTrialing:false,willRenew:false})
       return
@@ -179,6 +184,17 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       }).catch(() => {}).finally(() => {if(current) setIsLoading(false)})
     return () => { current = false }
   }, [userEmail])
+
+  useEffect(() => {
+    if (!isNative()) return
+    let alive = true
+    let remove: (() => void) | undefined
+    const refresh = () => { if (document.visibilityState === 'visible') void getSubscriptionInfo().then(info => { if (alive) setSubscriptionInfo(info) }) }
+    void listenForSubscriptionChanges(refresh).then(cleanup => { if (alive) remove = cleanup; else cleanup() })
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
+    return () => { alive = false; remove?.(); document.removeEventListener('visibilitychange', refresh); window.removeEventListener('focus', refresh) }
+  }, [])
 
   // Determine tier
   const tier = useMemo((): SubscriptionTier => {
@@ -258,7 +274,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       return success
     } catch (e) {
       console.error("[Subscription] Purchase failed:", e)
-      return false
+      throw e
     }
   }, [webCheckout])
 
@@ -303,7 +319,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     // On native, manage subscriptions through the OS settings
     // iOS: Settings > Apple ID > Subscriptions
     // Android: Play Store > Subscriptions
-    console.log("[Subscription] Manage subscription — directing user to OS settings")
+    if (isNative()) {
+      if (getPlatform() === 'ios') { await manageAppleSubscriptions(); return }
+      window.location.assign(getPlatform() === 'ios'
+        ? 'https://apps.apple.com/account/subscriptions'
+        : 'https://play.google.com/store/account/subscriptions')
+      return
+    }
+    window.location.assign('/support')
   }, [])
 
   return (
@@ -324,7 +347,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         isTrialActive,
         daysLeftInTrial,
         trialEndsAt,
-        canStartTrial: true,
+        canStartTrial: !isNativeApp,
         trialBlockedReason: null,
         customerId: null,
         setUserEmail,

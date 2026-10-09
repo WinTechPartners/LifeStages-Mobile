@@ -1,11 +1,13 @@
 import { LIFELINE_TOPICS as canonicalLifeLines } from '../lifelines'
+import { ANALYTICS_AGE_BANDS, AGE_BANDS } from '../age-bands'
+import { LIFE_CIRCUMSTANCE_IDS, isLifeCircumstanceId, type LifeCircumstanceId } from '../life-circumstances'
 
 // Shared, deliberately closed contract. Never add free text or arbitrary metadata.
 export const ANALYTICS_VERSION = 1 as const
 export const ANALYTICS_CONSENT_VERSION = 1 as const
 export const ANALYTICS_MAX_BATCH_SIZE = 25
 export const ANALYTICS_MAX_BODY_BYTES = 32_768
-export const analyticsAgeBands = ['13-17', '18-24', '25-34', '35-44', '45-54', '55-64', '65-74', '75+', 'legacy-18-23', 'legacy-24-64', 'legacy-65+'] as const
+export const analyticsAgeBands = ANALYTICS_AGE_BANDS
 export const analyticsEventKinds = ['app_open', 'chapter_displayed', 'verse_selected', 'explanation_requested', 'explanation_displayed', 'lifeline_selected', 'question_sent', 'content_displayed', 'foreground_interval'] as const
 export const analyticsContentTypes = ['sermon', 'reflection', 'context', 'stories', 'poetry', 'imagery', 'songs', 'bible'] as const
 export const analyticsSituations = ['general', 'new_beginnings', 'struggling', 'transitions'] as const
@@ -22,6 +24,8 @@ export interface AnalyticsEvent {
 export interface AnalyticsEnvelope {
   version: 1; consentVersion: 1; consentedAt: string; deviceId: string; churchId: string
   ageBand?: AnalyticsAgeBand; situation?: AnalyticsSituation; events: AnalyticsEvent[]
+  ageTaxonomyVersion?: 1 | 2
+  lifeCircumstances?: LifeCircumstanceId[]; circumstanceTaxonomyVersion?: 2; declarationsUpdatedAt?: string
 }
 export interface AnalyticsDeleteRequest { version: 1; deviceId: string; churchId: string }
 export type AnalyticsValidation<T> = { ok: true; value: T } | { ok: false; error: string }
@@ -35,11 +39,17 @@ const bad = (error: string): { ok: false; error: string } => ({ ok: false, error
 const knownTopics = new Set<string>(canonicalLifeLines.map(line => line.id))
 
 export function validateAnalyticsEnvelope(input: unknown, now = Date.now()): AnalyticsValidation<AnalyticsEnvelope> {
-  if (!record(input) || !keys(input, ['version', 'consentVersion', 'consentedAt', 'deviceId', 'churchId', 'ageBand', 'situation', 'events'])) return bad('Invalid envelope fields')
+  if (!record(input) || !keys(input, ['version', 'consentVersion', 'consentedAt', 'deviceId', 'churchId', 'ageBand', 'ageTaxonomyVersion', 'lifeCircumstances', 'circumstanceTaxonomyVersion', 'declarationsUpdatedAt', 'situation', 'events'])) return bad('Invalid envelope fields')
   if (input.version !== 1 || input.consentVersion !== 1) return bad('Unsupported contract or consent version')
   if (!isAnalyticsUuid(input.deviceId) || !isAnalyticsUuid(input.churchId)) return bad('Canonical church and device UUIDs required')
   if (!iso(input.consentedAt) || Date.parse(input.consentedAt) > now + 60_000) return bad('Invalid consent timestamp')
   if (input.ageBand !== undefined && !oneOf(input.ageBand, analyticsAgeBands)) return bad('Invalid age band')
+  if (input.ageTaxonomyVersion !== undefined && (input.ageBand === undefined || (input.ageTaxonomyVersion !== 1 && input.ageTaxonomyVersion !== 2))) return bad('Invalid age taxonomy version')
+  if (input.ageTaxonomyVersion === 2 && !oneOf(input.ageBand, AGE_BANDS)) return bad('Age band does not belong to taxonomy version 2')
+  if (input.ageTaxonomyVersion === 1 && ['13-15', '16-17', '25-39', '40-54'].includes(input.ageBand as string)) return bad('Age band does not belong to taxonomy version 1')
+  if (input.lifeCircumstances !== undefined && (!Array.isArray(input.lifeCircumstances) || input.lifeCircumstances.length > LIFE_CIRCUMSTANCE_IDS.length || !input.lifeCircumstances.every(isLifeCircumstanceId) || new Set(input.lifeCircumstances).size !== input.lifeCircumstances.length || input.circumstanceTaxonomyVersion !== 2)) return bad('Invalid declared life circumstances')
+  if (input.circumstanceTaxonomyVersion !== undefined && (input.circumstanceTaxonomyVersion !== 2 || input.lifeCircumstances === undefined)) return bad('Invalid circumstance taxonomy version')
+  if (input.declarationsUpdatedAt !== undefined && (!iso(input.declarationsUpdatedAt) || Date.parse(input.declarationsUpdatedAt) > now + 60_000)) return bad('Invalid declaration timestamp')
   if (input.situation !== undefined && !oneOf(input.situation, analyticsSituations)) return bad('Invalid situation')
   if (!Array.isArray(input.events) || input.events.length < 1 || input.events.length > ANALYTICS_MAX_BATCH_SIZE) return bad('Batch must contain 1 to 25 events')
   const eventIds = new Set<string>()

@@ -4,6 +4,15 @@ on:
     branches: [codex/lifestages-appetize-simulator]
     paths-ignore: ['docs/**', 'README.md']
   workflow_dispatch:
+    inputs:
+      signed_release:
+        description: Build a signed real-iPhone release instead of the simulator
+        type: boolean
+        default: false
+      upload:
+        description: Upload the signed release to App Store Connect
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -11,7 +20,8 @@ concurrency:
   cancel-in-progress: true
 jobs:
   simulator:
-    runs-on: macos-14
+    if: ${{ !inputs.signed_release }}
+    runs-on: macos-26
     timeout-minutes: 35
     env:
       NEXT_PUBLIC_API_BASE_URL: https://www.bibleforlifestages.com
@@ -22,6 +32,11 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Install native project tools
+        run: gem install cocoapods xcodeproj --no-document
       - name: Install locked dependencies
         run: npm ci --legacy-peer-deps
       - name: Check TypeScript
@@ -32,6 +47,7 @@ jobs:
         run: |
           npx cap add ios
           npx cap sync ios
+          ruby scripts/configure-storekit.rb
       - name: Set simulator privacy descriptions
         run: |
           /usr/libexec/PlistBuddy -c 'Add :NSMicrophoneUsageDescription string LifeStages uses your microphone when you choose voice chat.' ios/App/App/Info.plist
@@ -56,3 +72,9 @@ jobs:
             ios/App/Podfile
             ios/App/Podfile.lock
           retention-days: 14
+  signed-release:
+    if: ${{ inputs.signed_release }}
+    uses: ./.github/workflows/iphone-appstore.yml
+    with:
+      upload: ${{ inputs.upload || false }}
+    secrets: inherit

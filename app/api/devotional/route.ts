@@ -1,7 +1,12 @@
+import { entitlementProfile, hasPremium } from '@/lib/entitlements'
+import { cacheGet, cacheSet } from '@/lib/content-cache'
+import { preserveImage } from '@/lib/stored-images'
 import { NextRequest, NextResponse } from 'next/server'
 import { getCachedDevotional, saveCachedDevotional, getTodaysVerse } from '@/lib/supabase/cache'
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
+import { culturalInstruction } from "@/lib/cultural-context"
+import { normalizeProfile, policyKey, readerInstruction, POLICY } from "@/lib/content-policy"
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY!,
@@ -42,41 +47,20 @@ function normalizeAgeRange(age: string): string {
   return mapping[age] || age
 }
 
-// Generate image using Runware
-async function generateHeroImage(prompt: string, ageRange: string): Promise<string | null> {
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/generate-image`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        prompt, 
-        width: 1024, 
-        height: 768,
-        ageRange 
-      }),
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      return data.imageUrl || null
-    }
-  } catch (error) {
-    console.error('[API] Hero image generation failed:', error)
-  }
-  return null
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const body: RequestBody = await request.json()
+    const body = await entitlementProfile(await request.json())
     
     // Normalize values
-    const age_range = normalizeAgeRange(body.age_range)
-    const life_stage = normalizeLifeStage(body.life_stage)
-    const gender = body.gender || 'male'
-    const language = body.language || 'en'
+    // Content policy: Language + Country + Adult + Gender + General + Casual
+    const policyProfile = normalizeProfile(body as unknown as Record<string, unknown>)
+    await cacheSet("warmup-profile",policyKey(policyProfile),{profile:policyProfile})
+    const age_range = normalizeAgeRange(policyProfile.ageRange)
+    const life_stage = normalizeLifeStage(policyProfile.stageSituation)
+    const gender = policyProfile.gender
+    const language = policyProfile.language
     const church_id = body.church_id || null
-    const content_style = body.content_style || 'casual'
+    const content_style: string = policyProfile.contentStyle
 
     // Get verse - either from request or from today's schedule
     let verse_reference = body.verse_reference
@@ -108,9 +92,15 @@ export async function POST(request: NextRequest) {
     console.log('[API] Checking cache for:', JSON.stringify(cacheKey))
 
     // Check cache first
-    const cached = await getCachedDevotional(cacheKey)
+    const accessCacheKey = {...cacheKey, country:policyProfile.country, content_style, personalized:policyProfile.personalized, circumstances:policyProfile.lifeCircumstances.join("|")}
+    const cached = await cacheGet<any>('devotional-v3', accessCacheKey)
     
     if (cached) {
+      const originalImage = cached.image_url
+      const approved = originalImage ? await cacheGet<{approved:boolean; verse_reference?:string}>("image-policy", {url:originalImage}) : null
+      cached.image_url = approved?.approved && approved.verse_reference === cached.verse_reference ? await preserveImage(originalImage) : null
+      if (cached.image_url && cached.image_url !== originalImage) await saveCachedDevotional(cacheKey, { verse_text: cached.verse_text, reflection: cached.reflection, application: cached.application, prayer: cached.prayer, image_url: cached.image_url, audio_url: cached.audio_url }, MODEL_ID)
+
       console.log('[API] ⚡ CACHE HIT - returning cached devotional')
       return NextResponse.json({
         cache_hit: true,
@@ -144,14 +134,15 @@ export async function POST(request: NextRequest) {
     const languageInstruction = language !== 'en' 
       ? `IMPORTANT: Write the ENTIRE response in ${getLanguageName(language)}. Do not use English.`
       : ''
+    const culturalNote = (await culturalInstruction(language)) + readerInstruction(policyProfile)
 
-    const prompt = `You are creating a personalized devotional for someone who is:
+    const prompt = policyProfile.personalized ? `You are creating a personalized devotional for someone who is:
 - Age: ${ageContext}
 - Gender: ${gender}
 - Life Stage: ${lifeStageContext}
 
 ${styleInstruction}
-${languageInstruction}
+${languageInstruction}${culturalNote}
 
 Based on this verse: "${verse_text}" (${verse_reference})
 
@@ -169,12 +160,18 @@ Return ONLY valid JSON in this exact format (no markdown, no code blocks):
   "application": "...",
   "prayer": "...",
   "heroImagePrompt": "A brief, vivid description for an inspirational image that captures the essence of this verse and devotional"
-}`
+}` : `Explain this Bible verse for a general audience: "${verse_text}" (${verse_reference}).
+${styleInstruction}
+${languageInstruction}
+${culturalNote}
+Do not personalize to age, gender, name, or life situation. Do not assume the reader's family, work, health, feelings, or beliefs. Use ordinary everyday examples and preserve the meaning of the verse.
+Return JSON only: reflection (2-3 paragraphs of Friendly Breakdown), application (general examples), prayer (short optional general prayer), heroImagePrompt (a visual scene that communicates this specific verse, with no lettering).`
 
     const { text } = await generateText({
       model: openrouter(MODEL_ID),
       prompt,
       maxOutputTokens: 2500,
+      abortSignal: AbortSignal.timeout(30000),
     })
 
     // Parse the response
@@ -190,18 +187,8 @@ Return ONLY valid JSON in this exact format (no markdown, no code blocks):
       )
     }
 
-    // Generate hero image
-    let image_url: string | null = null
-    if (content.heroImagePrompt) {
-      console.log('[API] Generating hero image...')
-      image_url = await generateHeroImage(
-        `${content.heroImagePrompt}. Warm lighting, inspirational, photorealistic, no text or words.`,
-        age_range
-      )
-      if (image_url) {
-        console.log('[API] Hero image generated successfully')
-      }
-    }
+    // Images load independently so provider delays cannot block the breakdown.
+    const image_url: string | null = null
 
     // Save to cache
     const savedDevotional = await saveCachedDevotional(
@@ -219,6 +206,7 @@ Return ONLY valid JSON in this exact format (no markdown, no code blocks):
 
     console.log('[API] New devotional saved to Supabase cache:', savedDevotional?.id)
 
+    await cacheSet('devotional-v3', accessCacheKey, {verse_reference, verse_text, reflection:content.reflection, application:content.application, prayer:content.prayer, image_url, audio_url:null})
     return NextResponse.json({
       cache_hit: false,
       devotional: {

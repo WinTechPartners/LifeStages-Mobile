@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.lifestagesai.bible',
+  appId: 'com.bibleforlifestages',
   appName: 'LifeStages Bible',
   
   // CRITICAL: Bundle from local static export, NOT a remote URL

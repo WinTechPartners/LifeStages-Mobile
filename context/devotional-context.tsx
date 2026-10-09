@@ -1,5 +1,8 @@
 "use client"
 
+import { usePathname } from "next/navigation"
+import { normalizeLifeCircumstances } from "@/lib/life-circumstances"
+import { loadContentExtras } from "@/lib/content-loader"
 import React, { createContext, useContext, useState, type ReactNode, useCallback, useRef } from "react"
 import { useLanguage } from "./language-context"
 import { useSubscription } from "./subscription-context"
@@ -23,6 +26,12 @@ export interface ContextData {
 }
 
 export interface StoryData {
+  firstHalf?: string
+  secondHalf?: string
+  midImagePrompt?: string
+  midImg?: string
+  format?: string
+  imageErrors?: string[]
   title: string
   text: string
   imagePrompt?: string
@@ -96,6 +105,8 @@ interface DevotionalContextType {
   userName: string
   setUserName: React.Dispatch<React.SetStateAction<string>>
   clearCache: () => void
+  contentErrors: Record<string,string>
+  retryContent: () => void
   isContentReady: boolean
 }
 
@@ -127,10 +138,17 @@ interface UserProfile {
   stageSituation: string
   language?: string
   contentStyle?: "casual" | "academic"
+  lifeCircumstances?: string[]
   churchId?: string | null
 }
 
 export function DevotionalProvider({ children }: { children: ReactNode }) {
+  const pathname=usePathname()
+  const autoLoaded=useRef(false)
+  const extrasEpoch=useRef(0)
+  const [contentErrors,setContentErrors]=useState<Record<string,string>>({})
+  const [profileEpoch,setProfileEpoch]=useState(0)
+  React.useEffect(()=>{const changed=()=>setProfileEpoch(value=>value+1);window.addEventListener("lifestages-profile-changed",changed);return()=>window.removeEventListener("lifestages-profile-changed",changed)},[])
   const { canAccessPremium, userEmail } = useSubscription()
   const [devotional, setDevotional] = useState<DevotionalData>({})
   const [isLoading, setIsLoading] = useState(false)
@@ -154,7 +172,8 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
         return {
           email: userEmail || parsed.email,
           personalized: canAccessPremium,
-          ageRange: canAccessPremium ? parsed.ageRange || "adult" : "adult",
+          lifeCircumstances: canAccessPremium ? normalizeLifeCircumstances(parsed.lifeCircumstances) : [],
+          ageRange: canAccessPremium ? parsed.ageBand || parsed.ageRange || "40-54" : "40-54",
           gender: canAccessPremium ? parsed.gender || "male" : "male",
           stageSituation: canAccessPremium ? parsed.stageSituation || parsed.season || "General" : "General",
           language: selectedLanguage,
@@ -173,7 +192,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
       contentStyle: "casual",
       churchId: church?.id || null,
     }
-  }, [selectedLanguage, church?.id, canAccessPremium, userEmail])
+  }, [selectedLanguage, church?.id, canAccessPremium, userEmail, profileEpoch])
 
   // Load username on mount
   React.useEffect(() => {
@@ -238,6 +257,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
   const getDevotionalContent = useCallback(async (verse: VerseData, profile: UserProfile): Promise<DevotionalData | null> => {
     try {
       const response = await fetch(apiUrl("/api/devotional"), {
+        signal: AbortSignal.timeout(45000),
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -247,6 +267,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
           age_range: profile.ageRange,
           gender: profile.gender,
           life_stage: profile.stageSituation,
+          lifeCircumstances: profile.lifeCircumstances || [],
           language: profile.language || "en",
           church_id: profile.churchId || null,
           content_style: profile.contentStyle || "casual",
@@ -275,205 +296,17 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
   /**
    * Generate premium content in background - ONLY ONCE per session
    */
-  const generatePremiumContentInBackground = useCallback((verse: VerseData, profile: UserProfile) => {
-    // Only generate premium content once per session
-    if (premiumGeneratedRef.current) {
-      console.log("[Premium] Already generated this session, skipping")
-      return
-    }
-    premiumGeneratedRef.current = true
-    
-    const profilePayload = {
-      email: profile.email,
-      verseReference: verse.reference,
-      verseText: verse.text,
-      ageRange: profile.ageRange,
-      gender: profile.gender,
-      stageSituation: profile.stageSituation,
-      language: profile.language || "en",
-      contentStyle: profile.contentStyle || "casual",
-    }
-
-    console.log("[Premium] Starting background generation...")
-
-    // CONTEXT
-    setLoadingStates(prev => ({ ...prev, context: true }))
-    fetch(apiUrl("/api/generate-context"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(profilePayload),
+  const generatePremiumContentInBackground = useCallback((verse:VerseData,profile:UserProfile) => {
+    if (premiumGeneratedRef.current) return
+    premiumGeneratedRef.current=true
+    const epoch=++extrasEpoch.current
+    setContentErrors({})
+    const payload={...profile,verseReference:verse.reference,verseText:verse.text}
+    void loadContentExtras(apiUrl, payload, {
+      loading:(kind,value)=>{if(epoch===extrasEpoch.current)setLoadingStates(prev=>({...prev,[kind]:value}))},
+      result:(kind,data)=>{if(epoch===extrasEpoch.current)setDevotional(prev=>({...prev,...data}))},
+      error:(kind)=>{if(epoch===extrasEpoch.current)setContentErrors(prev=>({...prev,[kind]:'Could not load this content. Please retry.'}))},
     })
-      .then(res => res.json())
-      .then(data => {
-        setDevotional(prev => ({ ...prev, context: data.context, contextImagePrompt: data.contextImagePrompt }))
-        setLoadingStates(prev => ({ ...prev, context: false }))
-      })
-      .catch(() => setLoadingStates(prev => ({ ...prev, context: false })))
-
-    // STORIES - fetch content then generate images
-    setLoadingStates(prev => ({ ...prev, stories: true }))
-    Promise.all([
-      fetch(apiUrl("/api/generate-story"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...profilePayload, storyType: "contemporary" }) }).then(res => res.json()),
-      fetch(apiUrl("/api/generate-story"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...profilePayload, storyType: "historical" }) }).then(res => res.json()),
-    ])
-      .then(async ([s1, s2]) => {
-        const stories = [s1, s2]
-        // Set stories immediately (without images)
-        setDevotional(prev => ({ ...prev, stories }))
-        setLoadingStates(prev => ({ ...prev, stories: false }))
-        
-        // Generate images for each story in parallel
-        const imagePromises = stories.map(async (story: StoryData, index: number) => {
-          if (story.imagePrompt) {
-            try {
-              const imgResponse = await fetch(apiUrl("/api/generate-image"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  prompt: `${story.imagePrompt}. Cinematic, warm lighting, emotional, no text.`,
-                  width: 768,
-                  height: 512,
-                  ageRange: profile.ageRange
-                })
-              })
-              if (imgResponse.ok) {
-                const imgData = await imgResponse.json()
-                return { index, img: imgData.imageUrl }
-              }
-            } catch (e) {
-              console.error(`[Stories] Failed to generate image ${index}:`, e)
-            }
-          }
-          return null
-        })
-        
-        const results = await Promise.all(imagePromises)
-        results.forEach(result => {
-          if (result && result.img) {
-            setDevotional(prev => {
-              const updatedStories = [...(prev.stories || [])]
-              if (updatedStories[result.index]) {
-                updatedStories[result.index] = { ...updatedStories[result.index], img: result.img }
-              }
-              return { ...prev, stories: updatedStories }
-            })
-          }
-        })
-      })
-      .catch(() => setLoadingStates(prev => ({ ...prev, stories: false })))
-
-    // POETRY - fetch content then generate images
-    setLoadingStates(prev => ({ ...prev, poetry: true }))
-    Promise.all([
-      fetch(apiUrl("/api/generate-poem"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...profilePayload, poemType: "classic" }) }).then(res => res.json()),
-      fetch(apiUrl("/api/generate-poem"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...profilePayload, poemType: "freeverse" }) }).then(res => res.json()),
-    ])
-      .then(async ([p1, p2]) => {
-        const poems = [p1.poem, p2.poem]
-        // Set poetry immediately (without images)
-        setDevotional(prev => ({ ...prev, poetry: poems }))
-        setLoadingStates(prev => ({ ...prev, poetry: false }))
-        
-        // Generate images for each poem in parallel
-        const imagePromises = poems.map(async (poem: PoetryData, index: number) => {
-          if (poem.imagePrompt) {
-            try {
-              const imgResponse = await fetch(apiUrl("/api/generate-image"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  prompt: `${poem.imagePrompt}. Artistic, ethereal, poetic mood, soft lighting, no text.`,
-                  width: 512,
-                  height: 768,
-                  ageRange: profile.ageRange
-                })
-              })
-              if (imgResponse.ok) {
-                const imgData = await imgResponse.json()
-                return { index, img: imgData.imageUrl }
-              }
-            } catch (e) {
-              console.error(`[Poetry] Failed to generate image ${index}:`, e)
-            }
-          }
-          return null
-        })
-        
-        const results = await Promise.all(imagePromises)
-        results.forEach(result => {
-          if (result && result.img) {
-            setDevotional(prev => {
-              const updatedPoetry = [...(prev.poetry || [])]
-              if (updatedPoetry[result.index]) {
-                updatedPoetry[result.index] = { ...updatedPoetry[result.index], img: result.img }
-              }
-              return { ...prev, poetry: updatedPoetry }
-            })
-          }
-        })
-      })
-      .catch(() => setLoadingStates(prev => ({ ...prev, poetry: false })))
-
-    // IMAGERY - fetch content then generate images
-    setLoadingStates(prev => ({ ...prev, imagery: true }))
-    fetch(apiUrl("/api/generate-imagery"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(profilePayload) })
-      .then(res => res.json())
-      .then(async (data) => {
-        const imageryItems = data.imagery || []
-        // Set imagery immediately (without images)
-        setDevotional(prev => ({ ...prev, imagery: imageryItems }))
-        setLoadingStates(prev => ({ ...prev, imagery: false }))
-        
-        // Generate images for each imagery item in parallel
-        const imagePromises = imageryItems.map(async (item: ImageryData, index: number) => {
-          if (item.imagePrompt) {
-            try {
-              const imgResponse = await fetch(apiUrl("/api/generate-image"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  prompt: `${item.imagePrompt}. Symbolic, artistic, warm lighting, no text.`,
-                  width: 512,
-                  height: 512,
-                  ageRange: profile.ageRange
-                })
-              })
-              if (imgResponse.ok) {
-                const imgData = await imgResponse.json()
-                return { index, img: imgData.imageUrl }
-              }
-            } catch (e) {
-              console.error(`[Imagery] Failed to generate image ${index}:`, e)
-            }
-          }
-          return null
-        })
-        
-        // Update imagery items as images complete
-        const results = await Promise.all(imagePromises)
-        results.forEach(result => {
-          if (result && result.img) {
-            setDevotional(prev => {
-              const updatedImagery = [...(prev.imagery || [])]
-              if (updatedImagery[result.index]) {
-                updatedImagery[result.index] = { ...updatedImagery[result.index], img: result.img }
-              }
-              return { ...prev, imagery: updatedImagery }
-            })
-          }
-        })
-      })
-      .catch(() => setLoadingStates(prev => ({ ...prev, imagery: false })))
-
-    // SONGS
-    setLoadingStates(prev => ({ ...prev, songs: true }))
-    fetch(apiUrl("/api/generate-songs"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(profilePayload) })
-      .then(res => res.json())
-      .then(data => {
-        setDevotional(prev => ({ ...prev, songs: data.songs }))
-        setLoadingStates(prev => ({ ...prev, songs: false }))
-      })
-      .catch(() => setLoadingStates(prev => ({ ...prev, songs: false })))
   }, [])
 
   /**
@@ -489,7 +322,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
     }
     
     const profile = getFreshProfile()
-    const cacheKey = JSON.stringify(["access-v3", profile.personalized, "text-free-v3", source, profile.churchId, profile.ageRange, profile.gender, profile.stageSituation, profile.language, profile.contentStyle])
+    const cacheKey = JSON.stringify(["access-v3", profile.personalized, "text-free-v3", source, profile.churchId, profile.ageRange, profile.gender, profile.stageSituation, profile.lifeCircumstances, profile.language, profile.contentStyle])
     
     // If we already loaded this exact combination, skip
     if (lastLoadedKeyRef.current === cacheKey && devotional.verse) {
@@ -517,6 +350,8 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
       setLoadingStates(prev => ({ ...prev, verse: false, interpretation: true }))
       setLoadingStep("Loading your devotional...")
 
+      generatePremiumContentInBackground(verse, profile)
+
       // Get devotional content
       const content = await getDevotionalContent(verse, profile)
       
@@ -528,27 +363,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
           source,
         }))
 
-          // Generate hero image if missing from cache
-                if (!content.heroImage && verse) {
-                            fetch(apiUrl('/api/generate-image'), {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({
-                                                          prompt: 'Serene landscape with golden sunlight breaking through clouds, peaceful atmosphere, cinematic composition, warm lighting, inspirational, no text.',
-                                                          width: 1024,
-                                                          height: 768,
-                                                          ageRange: profile.ageRange
-                                          })
-                            })
-                              .then(res => res.json())
-                              .then(data => {
-                                              if (data.imageUrl) {
-                                                                setDevotional(prev => ({ ...prev, heroImage: data.imageUrl }))
-                                              }
-                              })
-                              .catch(err => console.error('[HeroImage] Generation failed:', err))
-                }
-        
+        // Verse artwork is fetched independently by the carousel.
         // Mark as ready
         setLoadingStates(prev => ({ ...prev, interpretation: false }))
         setIsLoading(false)
@@ -556,7 +371,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
         lastLoadedKeyRef.current = cacheKey
         
         // Fire premium content in background (only once)
-        if (canAccessPremium) generatePremiumContentInBackground(verse, profile)
+        generatePremiumContentInBackground(verse, profile)
         
       } else {
         setLoadingStates(prev => ({ ...prev, interpretation: false }))
@@ -589,18 +404,25 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Handle language changes
-  const accessKey = `${selectedLanguage}:${canAccessPremium}:${userEmail || "anonymous"}`
+  const accessKey = `${selectedLanguage}:${canAccessPremium}:${userEmail || "anonymous"}:${profileEpoch}`
   const prevLanguageRef = useRef(accessKey)
   React.useEffect(() => {
     if (prevLanguageRef.current === accessKey) return
+    if (isLoading) return
     prevLanguageRef.current = accessKey
-    if (devotional.verse && !isLoading) {
+    if (devotional.verse) {
       lastLoadedKeyRef.current = null
       premiumGeneratedRef.current = false
       generateDevotional(devotional.source || "YouVersion")
     }
   }, [accessKey, selectedLanguage, devotional.verse, devotional.source, isLoading, generateDevotional])
 
+  React.useEffect(()=>{
+    if (!['/','/verse','/context','/stories','/poetry','/imagery','/songs'].includes(pathname) || churchLoading || autoLoaded.current || devotional.verse) return
+    autoLoaded.current=true
+    void generateDevotional('YouVersion')
+  },[pathname,churchLoading,devotional.verse,generateDevotional])
+  const retryContent=useCallback(()=>{if(devotional.verse){premiumGeneratedRef.current=false;generatePremiumContentInBackground(devotional.verse,getFreshProfile())}},[devotional.verse,generatePremiumContentInBackground,getFreshProfile])
   return (
     <DevotionalContext.Provider
       value={{
@@ -617,6 +439,8 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
         setUserName,
         clearCache,
         isContentReady,
+        contentErrors,
+        retryContent,
       }}
     >
       {children}

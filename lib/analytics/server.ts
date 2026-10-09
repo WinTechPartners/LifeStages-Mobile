@@ -6,6 +6,7 @@ type AnalyticsEnvironment = Record<string, string | undefined>
 export interface AnalyticsStoredEvent {
   event_id: string; church_id: string; device_key: string; session_key: string; view_key: string | null
   contract_version: number; consent_version: number; consented_at: string; occurred_at: string
+  age_taxonomy_version: number | null; life_circumstances: string[] | null; circumstance_taxonomy_version: number | null; declarations_updated_at: string | null
   kind: AnalyticsEvent['kind']; age_band: string | null; situation: string | null; topic_id: string | null
   sermon_id: string | null; content_type: string | null; channel: string | null
   scripture: AnalyticsEvent['scripture'] | null; active_ms: number | null
@@ -33,6 +34,7 @@ export function mapAnalyticsEvents(envelope: AnalyticsEnvelope, secret: string):
     event_id: event.id.toLowerCase(), church_id: churchId, device_key: deviceKey,
     session_key: opaque('session', event.sessionId), view_key: event.viewId ? opaque('view', event.viewId) : null,
     contract_version: 1, consent_version: 1, consented_at: envelope.consentedAt, occurred_at: event.occurredAt,
+    age_taxonomy_version: envelope.ageTaxonomyVersion ?? null, life_circumstances: envelope.lifeCircumstances ? [...envelope.lifeCircumstances] : null, circumstance_taxonomy_version: envelope.circumstanceTaxonomyVersion ?? null, declarations_updated_at: envelope.declarationsUpdatedAt ?? null,
     kind: event.kind, age_band: envelope.ageBand || null, situation: envelope.situation || null,
     topic_id: event.topicId || null, sermon_id: event.sermonId?.toLowerCase() || null,
     content_type: event.contentType || null, channel: event.channel || null,

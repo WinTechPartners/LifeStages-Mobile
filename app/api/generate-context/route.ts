@@ -1,13 +1,22 @@
+import { entitlementProfile, hasPremium } from '@/lib/entitlements'
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
+import { languageInstruction } from "@/lib/language-instruction"
+import { culturalInstruction } from "@/lib/cultural-context"
+import { cacheGet, cacheSet } from "@/lib/content-cache"
+import { normalizeProfile, policyKey, readerInstruction } from "@/lib/content-policy"
 import { parseLLMJson } from "@/lib/parse-llm-json"
 
 export async function POST(request: Request) {
   try {
-    const { verseReference, verseText, source, sermonTitle, sermonSummary } = await request.json()
-
-    // Determine if this is sermon-based or verse-based
-    const isSermonMode = source === 'sermon' && sermonTitle
+    const body = await entitlementProfile(await request.json())
+    const { verseReference, verseText } = body
+    const p = normalizeProfile(body)
+    const language = p.language
+    const cultural = (await culturalInstruction(language)) + readerInstruction(p)
+    const cacheKey = policyKey(p, { verse: verseReference })
+    const hit = await cacheGet("context", cacheKey)
+    if (hit) return Response.json(hit)
 
     const openrouter = createOpenRouter({
       apiKey: process.env.OPENROUTER_API_KEY!,
@@ -15,42 +24,13 @@ export async function POST(request: Request) {
 
     const modelId = (process.env.OPENROUTER_MODEL_ID || "google/gemini-2.0-flash-001").trim()
 
-    if (isSermonMode) {
-      // Sermon context generation
-      const { text } = await generateText({
-        model: openrouter(modelId),
-        system: `You're a thoughtful ministry leader who helps people understand and apply sermon messages. You write with depth, warmth, and practical wisdom.
+    const { text } = await generateText({
+      model: openrouter(modelId),
+      abortSignal: AbortSignal.timeout(35000),
+      system: `You're a brilliant Bible scholar who makes history come alive. You love the details - the politics, the personalities, the drama. You write with depth and insight, not bullet points.
 
-Each field should be substantial (4-6 sentences) that gives real insight and practical guidance.`,
-        prompt: `Analyze this sermon and provide deep context:
-
-Sermon Title: "${sermonTitle}"
-Sermon Summary: "${sermonSummary}"
-
-Return JSON only:
-{
-  "context": {
-    "themes": "What are the main themes explored in this sermon? How do they connect to each other? What underlying truth ties everything together?",
-    "scriptures": "What scripture passages are central to this message? How do they support the sermon's themes? Include any key verses that should be studied further.",
-    "coreMessage": "What is the heart of this sermon? If someone had to remember just one thing, what would it be? Why does this message matter for believers today?",
-    "application": "How can listeners apply this message to their daily lives? What specific areas of life does this speak to? How might this change how we think, act, or relate to others?",
-    "questions": "What reflection questions help listeners go deeper? Include 3-4 thought-provoking questions for personal meditation or small group discussion.",
-    "actionSteps": "What concrete action steps can someone take this week? Be specific and practical. What would living out this message look like in daily life?"
-  }
-}`,
-        maxOutputTokens: 2500,
-      })
-
-      const data = parseLLMJson(text)
-      return Response.json(data)
-    } else {
-      // Original verse context generation
-      const { text } = await generateText({
-        model: openrouter(modelId),
-        system: `You're a brilliant Bible scholar who makes history come alive. You love the details - the politics, the personalities, the drama. You write with depth and insight, not bullet points.
-
-Each field should be a substantial paragraph (4-6 sentences) that gives real insight, not a one-liner summary. Include specific historical details, names, dates, political context, and interesting facts that illuminate the verse.`,
-        prompt: `Deep historical context for ${verseReference}: "${verseText}"
+Each field should be a substantial paragraph (4-6 sentences) that gives real insight, not a one-liner summary. Include specific historical details, names, dates, political context, and interesting facts that illuminate the verse.${languageInstruction(language, 'Every value inside the "context" object must be in that language. Only "contextImagePrompt" stays in English.')}${cultural}`,
+      prompt: `Deep historical context for ${verseReference}: "${verseText}"
 
 Return JSON only:
 {
@@ -65,12 +45,12 @@ Return JSON only:
   },
   "contextImagePrompt": "Cinematic historical scene capturing this moment, specific and evocative, 25 words"
 }`,
-        maxOutputTokens: 2500,
-      })
+      maxOutputTokens: 2500,
+    })
 
-      const data = parseLLMJson(text)
-      return Response.json(data)
-    }
+    const data = parseLLMJson(text)
+    await cacheSet("context", cacheKey, data)
+    return Response.json(data)
   } catch (error) {
     console.error("Context error:", error)
     return Response.json({ error: "Failed to generate context" }, { status: 500 })

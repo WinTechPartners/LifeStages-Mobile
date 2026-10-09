@@ -1,7 +1,8 @@
 "use client"
 
 import { Fragment, Suspense, type ReactNode } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useDevotional } from '@/context/devotional-context'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useChurch } from '@/context/church-context'
 import { useLanguage } from '@/context/language-context'
 import { useSubscription } from '@/context/subscription-context'
@@ -13,6 +14,8 @@ function Loading() {
 
 function ScopedContent({ children }: { children: ReactNode }) {
   const params = useSearchParams()
+  const pathname=usePathname()
+  const {contentErrors,retryContent}=useDevotional()
   const { church, isLoading } = useChurch()
   const { language } = useLanguage()
   const {canAccessPremium} = useSubscription()
@@ -23,7 +26,7 @@ function ScopedContent({ children }: { children: ReactNode }) {
   }
   // Remount content when its church, route, age, language, or personalization changes.
   const scope = `${canAccessPremium ? 'premium' : 'free'}:${contentCacheKey('page', params.toString(), church?.id, language)}`
-  return <Fragment key={scope}>{children}</Fragment>
+  return <Fragment key={scope}>{contentErrors[pathname.slice(1)] && <div role="alert" className="p-4 bg-amber-500/10 text-amber-100">{contentErrors[pathname.slice(1)]}<button className="ml-3 underline" onClick={retryContent}>Retry</button></div>}{children}</Fragment>
 }
 
 export function ContentContextBoundary({ children }: { children: ReactNode }) {

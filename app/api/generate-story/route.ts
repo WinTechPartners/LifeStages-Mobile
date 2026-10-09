@@ -1,89 +1,48 @@
-import { createOpenRouter } from "@openrouter/ai-sdk-provider"
-import { generateText } from "ai"
+import { entitlementProfile } from '@/lib/entitlements'
+import { createOpenRouter } from '@openrouter/ai-sdk-provider'
+import { generateText } from 'ai'
+import { languageInstruction } from '@/lib/language-instruction'
+import { culturalInstruction } from '@/lib/cultural-context'
+import { cacheGet, cacheSet } from '@/lib/content-cache'
+import { normalizeProfile, policyKey, readerInstruction } from '@/lib/content-policy'
+import { parseLLMJson } from '@/lib/parse-llm-json'
+import { validateModernStory, modernStoryVariant, STORY_FORMAT } from '@/lib/story-format'
 
 export async function POST(request: Request) {
   try {
-    const { verseReference, verseText, ageRange, stageSituation, storyType } = await request.json()
-
-    if (!verseReference || !verseText || !storyType) {
-      return Response.json({
-        title: "Story Unavailable",
-        text: "Unable to generate story.",
-        imagePrompt: "A peaceful scene",
-      }, { status: 400 })
+    const body = await entitlementProfile(await request.json())
+    const { verseReference, verseText } = body
+    const variant = modernStoryVariant(body.storyType)
+    if (!verseReference || !verseText || !variant) return Response.json({ error: 'A verse and story option are required' }, { status: 400 })
+    const p = normalizeProfile(body)
+    const cacheKey = policyKey(p, { verse: verseReference, verseText, storyType: variant, format: STORY_FORMAT })
+    const hit = await cacheGet('story', cacheKey)
+    if (hit) return Response.json(hit)
+    const provider = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! })
+    let otherStory = ''
+    if(variant==='modern-2'){
+      const firstKey=policyKey(p,{verse:verseReference,verseText,storyType:'modern-1',format:STORY_FORMAT})
+      let first:any=await cacheGet('story',firstKey)
+      if(!first){const response=await POST(new Request(request.url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,storyType:'modern-1'})}));if(!response.ok)throw Error('First story unavailable');first=await response.json()}
+      otherStory='The other story option is: '+JSON.stringify({title:first.title,text:first.text})+'. Your story must use different characters, a different setting, a different problem and a different resolution while communicating the same verse. Do not retell that plot or reuse names.'
     }
-
-    const openrouter = createOpenRouter({
-      apiKey: process.env.OPENROUTER_API_KEY!,
-    })
-
-    const modelId = (process.env.OPENROUTER_MODEL_ID || "google/gemini-2.0-flash-001").trim()
-
-    const settingPrompt = storyType === "contemporary" 
-      ? "Set in the present day (2024). Real people in real situations - not sanitized Christian fiction. Include messy emotions, imperfect characters, genuine struggle. The verse's truth should emerge through the story, not be preached at the end."
-      : "Set in a different time period or culture - could be ancient, medieval, another country, a historical moment. Show how this truth has echoed through human experience across time. Rich historical or cultural details."
-
-    const ageContext: Record<string, string> = {
-      teens: "Characters and situations relatable to teenagers - school, friendships, family conflict, social pressure, identity.",
-      university: "Characters navigating early adulthood - career uncertainty, relationships, independence, finding their way.",
-      adult: "Characters facing adult realities - work stress, marriage challenges, parenting, financial pressure, aging parents.",
-      senior: "Characters with life experience - legacy questions, health challenges, loss, wisdom gained through decades.",
-    }
-
-    const situationHint = stageSituation && stageSituation !== "Nothing special" && stageSituation !== "General"
-      ? `Weave in themes of: ${stageSituation}. Don't make it the whole story, but let it inform the emotional undercurrent.`
-      : ""
-
+    const perspective = variant === 'modern-1'
+      ? 'Use an ordinary present-day interaction in which the meaning becomes clear through what someone does.'
+      : 'Use a different present-day situation and a different set of characters. Let an unexpected conversation or small turning point reveal the meaning. Avoid a repetitive work-stress plot.'
     const { text } = await generateText({
-      model: openrouter(modelId),
-      system: `You're a literary fiction writer who happens to love scripture. You write stories that move people - not Christian propaganda, but real human stories where faith is one thread in the tapestry.
-
-${settingPrompt}
-
-${ageContext[ageRange] || ageContext.adult}
-
-${situationHint}
-
-CRAFT REQUIREMENTS:
-- 500-600 words
-- Show, don't tell. No moralizing.
-- Real dialogue that sounds like actual people talking
-- Emotional authenticity - let characters be messy, conflicted, human
-- A genuine story arc with tension and resolution
-- The verse's truth should be FELT, not explained
-- End with resonance, not a sermon
-- Literary quality - this should be genuinely good writing`,
-      prompt: `Write a story that brings ${verseReference} to life: "${verseText}"
-
-TITLE===
-[A literary, evocative title - not cheesy]
-===TITLE
-
-STORY===
-[Your 500-600 word story]
-===STORY
-
-IMAGE===
-[Cinematic scene from the story - specific moment, emotional, 25 words]
-===IMAGE`,
-      maxOutputTokens: 1800,
+      model: provider(process.env.OPENROUTER_MODEL_ID || 'google/gemini-2.5-flash-lite'),
+      abortSignal: AbortSignal.timeout(35000), maxOutputTokens: 2400,
+      system: `Write a short fictional story for a reader who understands Scripture best through concrete storytelling. BOTH story options are contemporary fiction set in modern day, in the reader's culture. No historical settings, real testimonies, or invented claims about real people. ${perspective}
+${otherStory}
+Use 350–500 words total, natural dialogue, relatable people, a clear beginning, tension, and a believable resolution. Ground the selected verse's central meaning in the events. Keep faith and the meaning of the passage intact. Do not tack on a sermon or a list of lessons.
+Split the continuous story into firstHalf and secondHalf at a natural midpoint turning point. Create TWO different photographic scene prompts: imagePrompt for the opening, midImagePrompt for the midpoint. Describe the same characters consistently in both; no lettering, captions, quotes, signs, labels or watermarks. Image prompts stay in English.${languageInstruction(p.language, 'title, firstHalf and secondHalf must all be in that language.')}${await culturalInstruction(p.language)}${readerInstruction(p)}`,
+      prompt: `Bring the meaning of ${verseReference} to life: ${verseText}
+Return JSON only: {"title":"...","firstHalf":"first half of the story, paragraphs separated by newlines","secondHalf":"continuous second half","imagePrompt":"opening scene with character appearance details","midImagePrompt":"different midpoint scene with consistent character details"}`,
     })
-
-    const titleMatch = text.match(/TITLE===\s*(.+?)\s*===TITLE/s)
-    const storyMatch = text.match(/STORY===\s*(.+?)\s*===STORY/s)
-    const imageMatch = text.match(/IMAGE===\s*(.+?)\s*===IMAGE/s)
-
-    return Response.json({
-      title: titleMatch?.[1]?.trim() || "A Story of Faith",
-      text: storyMatch?.[1]?.trim() || text.replace(/TITLE===.+?===TITLE/s, "").replace(/IMAGE===.+?===IMAGE/s, "").trim(),
-      imagePrompt: imageMatch?.[1]?.trim() || `Emotional scene depicting themes from ${verseReference}`,
-    })
-  } catch (error) {
-    console.error("Story error:", error)
-    return Response.json({
-      title: "Story Unavailable",
-      text: "Please try again later.",
-      imagePrompt: "A peaceful scene",
-    }, { status: 200 })
+    const result = validateModernStory(parseLLMJson(text))
+    await cacheSet('story', cacheKey, result)
+    return Response.json(result)
+  } catch {
+    return Response.json({ error: 'Unable to create this story. Please retry.' }, { status: 502 })
   }
 }

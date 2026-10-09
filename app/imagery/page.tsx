@@ -1,4 +1,5 @@
 "use client"
+import { AppImage } from "@/components/app-image"
 
 
 import { apiFetch } from "@/lib/api-base"
@@ -16,6 +17,7 @@ function ImageryContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { devotional } = useDevotional()
+  const [imageOverrides,setImageOverrides]=useState<Record<string,any>>({})
   const { church } = useChurch()
   const { language } = useLanguage()
   const mainRef = useRef<HTMLDivElement>(null)
@@ -30,7 +32,9 @@ function ImageryContent() {
   const contentId = isSermonMode ? sermonId || JSON.stringify([sermonTitle, sermonSummary]) : devotional.verse?.reference || ''
   const scopedCache = (kind: string) => contentCacheKey(kind, contentId, church?.id, language)
 
-  const imagery = isSermonMode ? sermonImagery : (devotional.imagery || [])
+  const imagery = (isSermonMode ? sermonImagery : (devotional.imagery || [])).map(item=>({...item,...imageOverrides[item.imagePrompt||item.title]}))
+  const retryIllustration=async(item:any)=>{const key=item.imagePrompt||item.title;setImageOverrides(prev=>({...prev,[key]:{img:null,imageErrors:[],retrying:true}}));try{const response=await apiFetch('/api/generate-image',{method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(120000),body:JSON.stringify({prompt:item.imagePrompt,width:768,height:512,language})});const data=await response.json();if(!response.ok||!data.imageUrl)throw Error('Unavailable');setImageOverrides(prev=>({...prev,[key]:{img:data.imageUrl,imageErrors:[],retrying:false}}))}catch{setImageOverrides(prev=>({...prev,[key]:{img:null,imageErrors:['img'],retrying:false}}))}}
+
   useContentDisplay(imagery.some(item => !!item?.title || !!item?.img), scopedCache('imagery'), 'imagery', sermonId)
 
   useEffect(() => {
@@ -195,10 +199,7 @@ function ImageryContent() {
                   <div key={i} className="flex flex-col gap-3 w-[260px] snap-center shrink-0 group cursor-pointer">
                     <div className="relative w-full aspect-square overflow-hidden rounded-2xl shadow-lg bg-gradient-to-br from-cyan-900/30 to-blue-900/30 border border-white/10">
                       {item.img ? (
-                        <div
-                          className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-                          style={{ backgroundImage: `url("${item.img}")` }}
-                        ></div>
+                        <AppImage src={item.img} alt={item.title} className="absolute inset-0 w-full h-full object-cover" onError={()=>setImageOverrides(prev=>({...prev,[item.imagePrompt||item.title]:{img:null,imageErrors:['img']}}))} />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center animate-pulse">
                           <span className="material-symbols-outlined text-cyan-500/50 text-4xl">brush</span>
@@ -214,6 +215,7 @@ function ImageryContent() {
                     <div>
                       <h3 className="text-base font-bold text-white">{item.title}</h3>
                       <p className="text-sm text-blue-200/70">{item.sub}</p>
+                      {item.imageErrors?.length>0 && <button onClick={()=>retryIllustration(item)} className="mt-3 text-cyan-300 underline text-sm">Retry illustration</button>}
                     </div>
                   </div>
                 ))}
@@ -246,15 +248,8 @@ function ImageryContent() {
                   key={i}
                   className="relative group rounded-2xl overflow-hidden cursor-zoom-in aspect-square bg-gradient-to-br from-blue-900/30 to-cyan-900/30 shadow-md border border-white/10"
                 >
-                  <img alt={image.title} className="w-full h-full object-cover" src={image.src || "/placeholder.svg"} />
+                  <AppImage alt={image.title} className="w-full h-full object-cover" src={image.src || "/placeholder.svg"} />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <div className="absolute bottom-0 left-0 right-0 p-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                    <p className="text-white text-xs font-medium truncate">{image.title}</p>
-                    <p className="text-white/70 text-xs">{image.source}</p>
-                  </div>
-                  <div className="absolute top-2 right-2 px-2 py-1 rounded-full bg-black/50 text-white text-xs">
-                    {image.source}
-                  </div>
                 </div>
               ))}
             </div>

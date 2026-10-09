@@ -150,3 +150,5 @@ test('persistent rate-cap result is surfaced without a success claim or provider
   assert.equal(response.status, 503)
   assert.equal(JSON.stringify(await response.json()).includes('private'), false)
 })
+
+test('declared overlapping circumstances and age versions survive storage mapping',()=>{const e=envelope({ageBand:'25-39',ageTaxonomyVersion:2,lifeCircumstances:['starting-new-job','new-baby'],circumstanceTaxonomyVersion:2,declarationsUpdatedAt:'2026-10-03T11:00:00Z'});assert.equal(contract.validateAnalyticsEnvelope(e,now).ok,true);const row=server.mapAnalyticsEvents(e,env.CHURCH_ANALYTICS_HMAC_SECRET)[0];assert.equal(row.age_taxonomy_version,2);assert.deepEqual(row.life_circumstances,['starting-new-job','new-baby']);assert.equal(row.circumstance_taxonomy_version,2)});
