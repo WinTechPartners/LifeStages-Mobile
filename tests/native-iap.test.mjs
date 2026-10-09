@@ -28,7 +28,17 @@ test('only known, unexpired native verified transactions grant access',()=>{
   for(const value of [{...active,expiresAt:0},{...active,productId:'other-app'},{...active,signedTransaction:undefined},{...active,status:'none'}]) assert.equal(f.adapter.normalizeAppleSubscription(value).status,'none')
 })
 test('cancellation and Ask to Buy pending never unlock access',async()=>{
-  for(const outcome of ['cancelled','pending']) assert.equal(await fixture({outcome}).adapter.purchaseProduct(monthly),false)
+  const cancelled=fixture({outcome:'cancelled'})
+  assert.equal(await cancelled.adapter.purchaseProduct(monthly),false)
+  assert.equal(cancelled.adapter.getAppleTransaction(),null)
+  const pending=fixture({outcome:'pending'})
+  await assert.rejects(pending.adapter.purchaseProduct(monthly),/awaiting approval/)
+  assert.equal(pending.adapter.getAppleTransaction(),null)
+})
+test('missing Apple bridge produces an actionable error without starting a charge',async()=>{
+  const f=fixture({available:false})
+  await assert.rejects(f.adapter.purchaseProduct(monthly),/Update LifeStages in TestFlight/)
+  assert.equal(f.calls.length,0)
 })
 test('backend not configured prevents invoking Apple purchase and charging',async()=>{
   const f=fixture({configured:false});await assert.rejects(f.adapter.purchaseProduct(monthly),/being set up/);assert.equal(f.calls.length,0)

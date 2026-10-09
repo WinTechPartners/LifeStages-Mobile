@@ -63,7 +63,7 @@ export function policyKey(
 
 /** Prompt block describing the reader, appended to every generation system prompt. */
 export function readerInstruction(p: ContentProfile): string {
-  if (!p.personalized) return `\nREADER: a general audience. This is FREE generic content. Do not tailor to age, gender, life stage, identity, or personal circumstances. Explain the selected scripture or Lifeline topic in warm, ordinary language.`
+  if (!p.personalized) return `\nREADER: a general audience. This is FREE content for a general audience. Do not tailor to age, gender, life stage, identity, or personal circumstances. Explain the selected scripture or Lifeline topic in warm, ordinary language.`
   const who = p.gender === "female" ? "woman" : "man"
   return `
 

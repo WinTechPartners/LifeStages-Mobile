@@ -11,6 +11,7 @@ function SubscriptionContent() {
   const {
     canStartTrial,
     tier,
+    ownerAccess,
     isTrialActive,
     daysLeftInTrial,
     isLoading,
@@ -68,9 +69,9 @@ function SubscriptionContent() {
   const freeFeatures = [
     { name: "Read the entire Bible — no email", included: true },
     { name: "Verse of the day — no email", included: true },
-    { name: "Generic Friendly Breakdown — no email", included: true },
-    { name: "Generic verse explanations — email only", included: true },
-    { name: "All generic Lifelines — email only", included: true },
+    { name: "Friendly Breakdown — no email", included: true },
+    { name: "verse explanations — email only", included: true },
+    { name: "All Lifelines — email only", included: true },
     { name: "Personalized stories", included: false },
     { name: "Poetry & hymns", included: false },
     { name: "Visual imagery", included: false },
@@ -93,6 +94,8 @@ function SubscriptionContent() {
         setTimeout(() => {
           router.push("/")
         }, 2000)
+      } else {
+        setError("Purchase cancelled. Your plan has not changed.")
       }
     } catch (err: any) {
       setError(
@@ -169,7 +172,7 @@ function SubscriptionContent() {
         {tier === "free" && (
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-white mb-2">Premium Brings Personalization</h1>
-            <p className="text-blue-200/70">The Bible, daily verse, and generic Friendly Breakdown are free without email. Email unlocks generic explanations and all Lifelines. Premium tailors breakdowns, Lifelines, stories, poetry, imagery, and context to YOUR profile.</p>
+            <p className="text-blue-200/70">The Bible, daily verse, and Friendly Breakdown are free without email. Email unlocks explanations and all Lifelines. Premium tailors breakdowns, Lifelines, stories, poetry, imagery, and context to YOUR profile.</p>
 
             {/* Free Trial Badge */}
             <div className="flex justify-center mt-4">
@@ -378,7 +381,7 @@ function SubscriptionContent() {
                 check_circle
               </span>
             </div>
-            <p className="text-white font-semibold">You&apos;re enjoying Premium!</p>
+            <p className="text-white font-semibold">{ownerAccess ? "Full owner access" : "You're enjoying Premium!"}</p>
             <p className="text-blue-200/70 text-sm">
               Thank you for using Bible for Life Stages
             </p>

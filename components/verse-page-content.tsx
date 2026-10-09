@@ -38,7 +38,7 @@ export default function VersePageContent() {
     }
   }
 
-  const lifelinesLimitText = tier === "free" ? "Free with email · generic" : "Personalized with Premium"
+  const lifelinesLimitText = tier === "free" ? "Free with email" : "Personalized with Premium"
   const showChurchBranding = hasChurch && !churchLoading
 
   return (

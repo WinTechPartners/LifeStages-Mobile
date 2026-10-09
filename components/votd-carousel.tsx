@@ -413,7 +413,7 @@ export function VOTDCarousel({
                       <div>
                         <h3 className="text-sm font-bold text-white">Friendly Breakdown</h3>
                         {!canAccessPremium && (
-                          <span className="text-[9px] text-blue-200/40">Free · Generic. Premium adds personalization.</span>
+                          <span className="text-[9px] text-blue-200/40">Premium adds personalization.</span>
                         )}
                       </div>
                     </div>

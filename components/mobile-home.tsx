@@ -157,7 +157,7 @@ export default function MobileHome() {
       )}
 
       {/* ========================================================
-          BLOCK 1 & 2: Logo + Title (Generic or Church)
+          BLOCK 1 & 2: Logo + Title (or Church)
           ======================================================== */}
       <header className="church-brand-surface relative z-30 flex flex-col items-center px-4 pt-16 pb-5 backdrop-blur-xl border-b border-white/5">
         <div className="flex min-w-0 flex-col items-center gap-3 text-center">
@@ -210,21 +210,7 @@ export default function MobileHome() {
               <span className="material-symbols-outlined text-amber-400/50 text-lg">chevron_right</span>
             </button>
           </div>
-        ) : (
-          /* Generic variant: AI + Secure badges */
-          <div className="px-5 pt-3 pb-2">
-            <div className="flex items-center justify-center gap-3">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-400/20">
-                <span className="material-symbols-outlined text-amber-400 text-sm">auto_awesome</span>
-                <span className="text-[10px] text-amber-300 font-semibold">AI-Powered</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-400/20">
-                <span className="material-symbols-outlined text-emerald-400 text-sm">lock</span>
-                <span className="text-[10px] text-emerald-300 font-semibold">Private & Secure</span>
-              </div>
-            </div>
-          </div>
-        )}
+        ) : null}
 
         {/* ========================================================
             BLOCK 4: Read the Bible
@@ -321,9 +307,9 @@ export default function MobileHome() {
 
         {/* ========================================================
             BLOCKS 8, 9, 10: VOTD Carousel (swipeable)
-            8. Verse of Day image (generic or personalized for paying)
-            9. Verse of the Day (generic or church-defined)
-            10. Friendly Breakdown (generic or personalized for paying)
+            8. Verse of Day image (or personalized for paying)
+            9. Verse of the Day (or church-defined)
+            10. Friendly Breakdown (or personalized for paying)
             ======================================================== */}
         <VOTDCarousel
           todayVerse={displayVerse ? { reference: displayVerse.reference, text: displayVerse.text } : undefined}
@@ -355,7 +341,7 @@ export default function MobileHome() {
 
         {/* ========================================================
             BLOCK 11: Bringing Scripture to Life
-            (generic for free users, not shown for paying customers)
+            (for free users, not shown for paying customers)
             ======================================================== */}
         {!canAccessPremium && displayVerse && (
           <div className="px-5 pb-4">
@@ -426,7 +412,7 @@ export default function MobileHome() {
 
         {/* ========================================================
             BLOCK 12: Quote from Sarah
-            (generic for free users, not shown for paying customers)
+            (for free users, not shown for paying customers)
             ======================================================== */}
         {!canAccessPremium && displayVerse && (
           <div className="px-5 pb-8">

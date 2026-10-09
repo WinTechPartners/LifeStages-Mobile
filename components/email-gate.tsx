@@ -107,7 +107,7 @@ export default function EmailGate({ children, required = false, onContinue }: { 
         {/* Trust/Privacy */}
         <div className="text-center space-y-2">
           <p className="text-blue-200/40 text-xs">
-            Your email unlocks generic explanations and all Lifelines. Personalization requires Premium.
+            Your email unlocks explanations and all Lifelines. Personalization requires Premium.
             Permission to connect you with church leadership for care is controlled separately in your profile.
           </p>
           <div className="flex items-center justify-center gap-4 text-xs text-blue-200/30">

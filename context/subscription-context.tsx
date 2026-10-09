@@ -31,6 +31,7 @@ interface SubscriptionContextType {
   isLoading: boolean
   subscriptionStatus: SubscriptionStatus
   userEmail: string | null
+  ownerAccess: boolean
 
   // Products from the store
   products: IAPProduct[]
@@ -95,6 +96,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [isNativeApp, setIsNativeApp] = useState(false)
   useEffect(() => { setIsNativeApp(isNative()) }, [])
   const [userEmail, setUserEmailState] = useState<string | null>(null)
+  const [ownerAccess, setOwnerAccess] = useState(false)
   const [subscriptionInfo, setSubscriptionInfo] = useState<IAPSubscriptionInfo>({
     status: "none",
     productId: null,
@@ -168,7 +170,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    if (isNative()) return
+    setOwnerAccess(false)
     if (!userEmail) {
       if (!isNative()) setSubscriptionInfo({status:'none',productId:null,expiresAt:null,isTrialing:false,willRenew:false})
       return
@@ -178,6 +180,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     apiFetch('/api/stripe/status', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email:userEmail}) })
       .then(r => r.ok ? r.json() : null).then(data => {
         if (!current || !data) return
+        setOwnerAccess(data.ownerAccess === true)
+        // Native subscriptions still come from Apple; the server-confirmed owner exception is separate.
+        if (isNative()) return
         if (data.isActive) setSubscriptionInfo({status:data.isTrialing ? 'trialing' : 'active', productId:null,
           expiresAt:data.trialEndsAt ? new Date(data.trialEndsAt).getTime() : null, isTrialing:!!data.isTrialing, willRenew:!data.ownerAccess})
         else if (!isNative()) setSubscriptionInfo({status:'none',productId:null,expiresAt:null,isTrialing:false,willRenew:false})
@@ -198,10 +203,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
   // Determine tier
   const tier = useMemo((): SubscriptionTier => {
+    if (ownerAccess) return "premium"
     if (subscriptionInfo.status === "trialing") return "trial"
     if (subscriptionInfo.status === "active") return "premium"
     return "free"
-  }, [subscriptionInfo])
+  }, [subscriptionInfo, ownerAccess])
 
   // Computed
   const isPremium = tier === "premium"
@@ -209,7 +215,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const canAccessPremium = isPremium || isTrialActive
   const canAccessCore = true
   const canSearchCustomVerse = canAccessCore
-  const subscriptionStatus = subscriptionInfo.status
+  const subscriptionStatus = ownerAccess ? "active" : subscriptionInfo.status
 
   // Trial info
   const trialEndsAt = subscriptionInfo.isTrialing ? subscriptionInfo.expiresAt : null
@@ -336,6 +342,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         isLoading,
         subscriptionStatus,
         userEmail,
+        ownerAccess,
         products,
         isPremium,
         canAccessPremium,

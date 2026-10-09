@@ -44,13 +44,16 @@ export async function restorePurchases():Promise<IAPSubscriptionInfo> {
   return accept(await store.restore())
 }
 export async function purchaseProduct(productId:string):Promise<boolean> {
-  if (!known(productId) || !await initializeIAP()) return false
+  if (!known(productId)) throw Error('This subscription plan is unavailable.')
+  if (!await initializeIAP()) throw Error('Apple billing is unavailable in this app build. Update LifeStages in TestFlight and try again.')
   // Prevent charging anyone before the hosted personalization verifier is configured.
   const response=await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || ''}/api/apple/status`,{cache:'no-store'})
   if (!response.ok || !(await response.json()).configured) throw Error('Apple subscriptions are being set up. Please try again later.')
   const result=await store.purchase({productId})
-  if (result.outcome!=='purchased' || !result.subscription) return false
-  return accept(result.subscription).status!=='none'
+  if (result.outcome==='cancelled') return false
+  if (result.outcome==='pending') throw Error('Your Apple purchase is awaiting approval. Your plan will update after Apple confirms it.')
+  if (!result.subscription || accept(result.subscription).status==='none') throw Error('Apple has not confirmed an active subscription. Please use Restore Purchases or try again.')
+  return true
 }
 export async function listenForSubscriptionChanges(listener:()=>void):Promise<()=>void> {
   if (!await initializeIAP()) return ()=>{}

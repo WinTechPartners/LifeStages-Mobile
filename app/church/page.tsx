@@ -454,7 +454,7 @@ export default function ChurchLandingPage() {
                   <strong className="text-amber-400">Not yours.</strong>
                 </p>
                 <p>
-                  Generic devotionals don't reinforce your teaching. They don't prepare hearts for Sunday. They don't extend your pastoral care into daily life.
+                  devotionals don't reinforce your teaching. They don't prepare hearts for Sunday. They don't extend your pastoral care into daily life.
                 </p>
                 <p className="text-white font-semibold">
                   Life Stages changes that — putting YOUR voice in their pocket, every single day.
@@ -1267,7 +1267,7 @@ export default function ChurchLandingPage() {
                 <blockquote className="my-4 pl-4 border-l-2 border-amber-400/50">
                   <p className="text-white text-sm italic leading-relaxed">
                     &ldquo;How can Scripture help me right now? If I open the Bible, I&apos;m reading the same 
-                    generic verse my 26-year-old son is reading, the same verse my 21-year-old daughter is reading. 
+                    verse my 26-year-old son is reading, the same verse my 21-year-old daughter is reading.
                     We&apos;re in totally different places. Scripture doesn&apos;t know what&apos;s happening in my life.&rdquo;
                   </p>
                 </blockquote>
