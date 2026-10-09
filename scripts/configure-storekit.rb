@@ -32,7 +32,7 @@ unless text.include?('LifeStagesBridgeViewController')
   raise 'Bridge replacement failed' unless text.include?('LifeStagesBridgeViewController')
   File.write(storyboard, text)
 end
-brand = File.join(root, 'public/images/front-page-icon.jpg')
+brand = File.join(root, 'public/images/lifestages-app-icon.png')
 raise 'LifeStages brand artwork missing' unless File.file?(brand)
 icon_dir = File.join(app, 'Assets.xcassets/AppIcon.appiconset')
 FileUtils.mkdir_p(icon_dir)
