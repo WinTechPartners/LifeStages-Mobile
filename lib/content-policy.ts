@@ -36,8 +36,7 @@ export interface ContentProfile {
 export function normalizeProfile(input: Record<string, unknown> | null | undefined): ContentProfile {
   const src = (input || {}) as Record<string, unknown>
   const nested = (src.profile || {}) as Record<string, unknown>
-  const rawLang = String(src.language || nested.language || "en").toLowerCase()
-  const language = rawLang.split("-")[0] || "en"
+  const language = "en"
   const personalized = src.__personalizationAuthorized === true
   const rawGender = String(src.gender || nested.gender || "").toLowerCase()
   const gender: Gender = rawGender.startsWith("f") ? "female" : "male"
@@ -63,9 +62,9 @@ export function policyKey(
 
 /** Prompt block describing the reader, appended to every generation system prompt. */
 export function readerInstruction(p: ContentProfile): string {
-  if (!p.personalized) return `\nREADER: a general audience. This is FREE content for a general audience. Do not tailor to age, gender, life stage, identity, or personal circumstances. Explain the selected scripture or Lifeline topic in warm, ordinary language.`
+  if (!p.personalized) return `\nREADER: a general audience. This is FREE content for a general audience. Do not tailor to age, gender, life stage, identity, or personal circumstances. Explain the selected scripture or Lifeline topic in warm, ordinary language. Write all reader-facing content in English.`
   const who = p.gender === "female" ? "woman" : "man"
   return `
 
-READER: a ${who} aged ${p.ageRange} living in ${p.country}. Life stage: ${p.stageSituation}. Explicitly selected circumstances: ${(p.lifeCircumstances || []).map(id=>LIFE_CIRCUMSTANCES.find(c=>c.id===id)?.label || id).join(", ") || "not supplied"}. Age does not establish any family, employment, or caregiving circumstance. Do not invent personal history. Write in a casual, warm, everyday conversational tone, like a caring friend. Personalize naturally for a ${who} without making gender the subject.`
+READER: a ${who} aged ${p.ageRange} living in ${p.country}. Life stage: ${p.stageSituation}. Explicitly selected circumstances: ${(p.lifeCircumstances || []).map(id=>LIFE_CIRCUMSTANCES.find(c=>c.id===id)?.label || id).join(", ") || "not supplied"}. Age does not establish any family, employment, or caregiving circumstance. Do not invent personal history. Write in a casual, warm, everyday conversational tone, like a caring friend. Personalize naturally for a ${who} without making gender the subject. Write all reader-facing content in English.`
 }

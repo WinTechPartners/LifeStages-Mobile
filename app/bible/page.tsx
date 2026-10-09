@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useSubscription } from "@/context/subscription-context"
 import EmailGate from "@/components/email-gate"
-import { LanguageSelector } from "@/components/language-selector"
 import { HeaderDropdown } from "@/components/header-dropdown"
 import { useChurch } from "@/context/church-context"
 import { resolveScriptureLink } from "@/lib/scripture-link"
@@ -341,7 +340,7 @@ export default function BiblePage() {
           reference,
           profile,
           ageRange: canAccessPremium ? profile.ageRange || "adult" : "adult",
-          language: profile.language || "en"
+          language: "en"
         })
       })
       
@@ -420,7 +419,6 @@ export default function BiblePage() {
               </option>
             ))}
           </select>
-          <LanguageSelector />
           <HeaderDropdown verseReference={viewMode === "reading" ? `${selectedBook?.name} ${selectedChapter}` : undefined} />
         </div>
       </header>

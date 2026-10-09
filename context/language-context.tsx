@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useEffect, type ReactNode } from "react"
 
 export type LanguageCode = "en" | "es" | "fr" | "de" | "zh" | "vi" | "ko" | "th" | "pt"
 
@@ -13,14 +13,6 @@ export interface Language {
 
 export const SUPPORTED_LANGUAGES: Language[] = [
   { code: "en", name: "English", nativeName: "English", flag: "🇺🇸" },
-  { code: "es", name: "Spanish", nativeName: "Español", flag: "🇪🇸" },
-  { code: "fr", name: "French", nativeName: "Français", flag: "🇫🇷" },
-  { code: "de", name: "German", nativeName: "Deutsch", flag: "🇩🇪" },
-  { code: "pt", name: "Portuguese", nativeName: "Português", flag: "🇧🇷" },
-  { code: "zh", name: "Chinese", nativeName: "中文", flag: "🇨🇳" },
-  { code: "vi", name: "Vietnamese", nativeName: "Tiếng Việt", flag: "🇻🇳" },
-  { code: "ko", name: "Korean", nativeName: "한국어", flag: "🇰🇷" },
-  { code: "th", name: "Thai", nativeName: "ไทย", flag: "🇹🇭" },
 ]
 
 // UI translations
@@ -335,23 +327,21 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<LanguageCode>("en")
+  const language: LanguageCode = "en"
 
   useEffect(() => {
-    const saved = localStorage.getItem("userLanguage")
-    if (saved && SUPPORTED_LANGUAGES.some((l) => l.code === saved)) {
-      setLanguageState(saved as LanguageCode)
-    }
+    localStorage.setItem("userLanguage", "en")
+    localStorage.removeItem("selectedLanguage")
+    try {
+      const saved = localStorage.getItem("userProfile")
+      if (saved) {
+        const profile = JSON.parse(saved)
+        localStorage.setItem("userProfile", JSON.stringify({ ...profile, language: "en" }))
+      }
+    } catch { /* English remains active if an old profile cannot be read. */ }
   }, [])
 
-  const setLanguage = (lang: LanguageCode) => {
-    setLanguageState(lang)
-    localStorage.setItem("userLanguage", lang)
-    try {
-      const profile = JSON.parse(localStorage.getItem('userProfile') || '{}')
-      localStorage.setItem('userProfile', JSON.stringify({...profile, language:lang}))
-    } catch { /* The language preference remains usable without a profile. */ }
-  }
+  const setLanguage = (_lang: LanguageCode) => { localStorage.setItem("userLanguage", "en") }
 
   const t = (key: string): string => {
     return translations[language][key] || translations.en[key] || key

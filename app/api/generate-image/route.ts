@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     width = body.width || 1024
     height = body.height || 1024
     ageRange = POLICY.ageRange
-    const language: string = body.language || "en"
+    const language: string = "en"
 
     // Anchor every non-English image in the reader's country so the model
     // never defaults to Western faces or American scenery, whatever the

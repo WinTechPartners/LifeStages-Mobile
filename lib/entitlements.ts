@@ -33,7 +33,7 @@ export async function entitlementProfile(input: Record<string, any>): Promise<Re
     country: source.country || input.country,
   } : { lifeCircumstances: [], ageRange: '40-54', gender: 'male', stageSituation: 'General', contentStyle: 'casual', fullName: undefined, country: undefined }
   const { appleTransaction: _receipt, ...safeInput } = input
-  return { ...safeInput, ...profile, age_range: profile.ageRange, life_stage: profile.stageSituation,
-    content_style: profile.contentStyle, profile: { ...source, ...profile }, userProfile: { ...source, ...profile },
+  return { ...safeInput, ...profile, language: "en", age_range: profile.ageRange, life_stage: profile.stageSituation,
+    content_style: profile.contentStyle, profile: { ...source, ...profile, language: "en" }, userProfile: { ...source, ...profile, language: "en" },
     __personalizationAuthorized: personalized }
 }

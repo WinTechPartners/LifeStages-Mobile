@@ -1,3 +1,4 @@
+import { entitlementProfile, hasPremium } from '@/lib/entitlements'
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
 
@@ -61,14 +62,9 @@ YOUR TEEN CHARACTERS MUST NEVER:
 
 export async function POST(request: Request) {
   try {
-    const { verseReference, verseText, ageRange, stageSituation, language = "en", source, sermonTitle, sermonSummary } = await request.json()
+    const { verseReference, verseText, ageRange, stageSituation, language = "en" } = await entitlementProfile(await request.json())
 
-    // Determine if this is sermon-based or verse-based
-    const isSermonMode = source === 'sermon' && sermonTitle
-    const contentReference = isSermonMode ? sermonTitle : verseReference
-    const contentText = isSermonMode ? sermonSummary : verseText
-
-    console.log("[v0] generate-stories called for age:", ageRange, "situation:", stageSituation, "mode:", isSermonMode ? 'sermon' : 'verse')
+    console.log("[v0] generate-stories called for age:", ageRange, "situation:", stageSituation)
 
     const openrouter = createOpenRouter({
       apiKey: process.env.OPENROUTER_API_KEY!,
@@ -115,24 +111,7 @@ STORY_2_TEXT===
 STORY_2_IMAGE===
 [Detailed image prompt for story 2]
 ===STORY_2_IMAGE`,
-      prompt: isSermonMode 
-        ? `Create 2 completely unique stories that bring the sermon "${contentReference}" to life for someone who is ${ageRange} and ${stageSituation}.
-
-Sermon summary: ${contentText}
-
-Story 1: Modern day scenario - create a NEW original situation showing how the sermon's message applies today
-Story 2: Historical/biblical era scenario showing the timeless truth of this message
-
-Requirements:
-- Each story MUST be 500+ words
-- Rich dialogue showing authentic character voice
-- Deep emotional moments that readers will feel
-- Vivid sensory details (what characters see, hear, feel)
-- Clear connection showing how the sermon's message speaks to the situation
-- Characters that match the age range EXACTLY${languageInstruction}
-
-Be creative and original - surprise me with fresh scenarios!`
-        : `Create 2 completely unique stories that bring ${contentReference}: "${contentText}" to life for someone who is ${ageRange} and ${stageSituation}.
+      prompt: `Create 2 completely unique stories that bring ${verseReference}: "${verseText}" to life for someone who is ${ageRange} and ${stageSituation}.
 
 Story 1: Modern day scenario - create a NEW original situation (not the examples)
 Story 2: Historical/biblical era scenario

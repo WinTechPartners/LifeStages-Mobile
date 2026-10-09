@@ -8,7 +8,6 @@ import { useDevotional } from "@/context/devotional-context"
 import { useSubscription } from "@/context/subscription-context"
 import { useLanguage } from "@/context/language-context"
 import { useChurch } from "@/context/church-context"
-import { LanguageSelector } from "@/components/language-selector"
 import { HeaderDropdown } from "@/components/header-dropdown"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
 import { VOTDCarousel } from "@/components/votd-carousel"
@@ -177,7 +176,7 @@ export default function MobileHome() {
             <p className="text-[10px] opacity-70 font-medium tracking-wide">{showChurchBranding ? "POWERED BY LIFESTAGES" : "BIBLE FOR LIFE STAGES"}</p>
           </div>
         </div>
-        <div className="absolute top-3 right-4 flex items-center gap-1"><LanguageSelector /><HeaderDropdown verseReference={devotional.verse?.reference} /></div>
+        <div className="absolute top-3 right-4 flex items-center gap-1"><HeaderDropdown verseReference={devotional.verse?.reference} /></div>
       </header>
 
       {/* Scrollable Content */}

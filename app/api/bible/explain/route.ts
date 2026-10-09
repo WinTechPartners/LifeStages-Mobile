@@ -1,10 +1,17 @@
+import { entitlementProfile, hasPremium } from '@/lib/entitlements'
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
+import { culturalInstruction } from "@/lib/cultural-context"
+import { cacheGet, cacheSet } from "@/lib/content-cache"
+import { normalizeProfile, policyKey, readerInstruction } from "@/lib/content-policy"
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const { selectedText, reference, ageRange = "adult", language = "en" } = body
+    const body = await entitlementProfile(await request.json())
+    if (!body.email) return Response.json({error: 'Email is required for free verse explanations'}, {status: 401})
+    const { selectedText, reference } = body
+    const p = normalizeProfile(body)
+    const { language, ageRange } = p
 
     console.log("[Explain API] Request received:", { 
       textLength: selectedText?.length, 
@@ -40,7 +47,13 @@ export async function POST(request: Request) {
     const ageInstruction = ageContext[ageRange] || ageContext.adult
 
     const langName = language !== "en" ? getLanguageName(language) : null
-    const langNote = langName ? ` Respond entirely in ${langName}.` : ""
+    const langNote = langName ? ` Respond entirely in ${langName}. Do not use English.` : ""
+    const cultural = (await culturalInstruction(language)) + readerInstruction(p)
+
+    // Same highlighted text and reference -> same explanation for everyone in that language, country, and gender
+    const cacheKey = policyKey(p, { text: selectedText, reference })
+    const hit = await cacheGet<{ explanation: string }>("explain", cacheKey)
+    if (hit?.explanation) return Response.json(hit)
 
     console.log("[Explain API] Generating explanation for:", selectedText.substring(0, 50), "...")
 
@@ -48,7 +61,7 @@ export async function POST(request: Request) {
       model: openrouter(modelId),
       system: `You are a friendly Bible study companion who explains scripture in plain, accessible language.
 
-${ageInstruction}${langNote}
+${ageInstruction}${langNote}${cultural}
 
 STYLE:
 - Conversational, like explaining to a friend over coffee
@@ -60,7 +73,7 @@ STYLE:
 
 "${selectedText}"
 
-Give a friendly, plain-English explanation of what this means. Start with a brief paraphrase in modern language, then unpack the key idea. Make it practical and relatable.`,
+Give a friendly, plain-language explanation of what this means${langName ? ` (in ${langName})` : ""}. Start with a brief paraphrase in modern language, then unpack the key idea. Make it practical and relatable.`,
       maxOutputTokens: 400,
     })
 
@@ -70,6 +83,7 @@ Give a friendly, plain-English explanation of what this means. Start with a brie
       return Response.json({ error: "Empty response from AI" }, { status: 500 })
     }
 
+    await cacheSet("explain", cacheKey, { explanation: text.trim() })
     return Response.json({ explanation: text.trim() })
   } catch (error) {
     console.error("[Explain API] Error details:", error)

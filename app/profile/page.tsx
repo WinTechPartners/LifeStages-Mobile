@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useLanguage } from "@/context/language-context"
-import { LanguageSelector } from "@/components/language-selector"
 import { useSubscription } from "@/context/subscription-context"
 import { ChurchCarePreferences } from "@/components/church-care-preferences"
 import { AGE_BANDS, isAgeBand, isKnownAgeBand, isPersonalizationAgeRange, resolveAgeDeclaration, toPersonalizationAgeRange } from "@/lib/age-bands"
@@ -178,12 +177,7 @@ export default function ProfilePage() {
 
       {/* Form Section */}
       <div className="flex flex-col gap-5 px-6 py-6">
-        <label className="flex flex-col gap-1.5 w-full">
-          <p className="text-sm font-medium leading-normal">{t("language")}</p>
-          <LanguageSelector variant="full" />
-        </label>
-
-        {/* Name Input */}
+{/* Name Input */}
         <label className="flex flex-col gap-1.5 w-full">
           <p className="text-sm font-medium leading-normal">{t("fullName")}</p>
           <input

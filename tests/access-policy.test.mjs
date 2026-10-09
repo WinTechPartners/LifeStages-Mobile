@@ -42,3 +42,10 @@ test('images fail closed when text detection is unavailable',async()=>{
   const api=load('image-text-check.ts')
   assert.equal(await api.isTextFree('data:image/jpeg;base64,YQ=='),false)
 })
+
+test('English-only requests ignore old language preferences while retaining paid country context',()=>{
+  const api=load('content-policy.ts',{'@/lib/cultural-context':{getCountryForLanguage:()=> 'United States'}})
+  const p=api.normalizeProfile({__personalizationAuthorized:true,language:'vi',profile:{language:'es',country:'Vietnam'}})
+  assert.equal(p.language,'en');assert.equal(p.country,'Vietnam');assert.match(api.readerInstruction(p),/content in English/)
+  assert.equal(api.normalizeProfile({language:'es'}).language,'en')
+})
