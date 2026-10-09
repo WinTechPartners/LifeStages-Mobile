@@ -105,7 +105,7 @@ export default function PrivacyPage() {
           <li><strong>ElevenLabs</strong>: the optional voice conversation feature</li>
           <li><strong>Supabase</strong>: our database and backend hosting</li>
           <li><strong>Resend</strong>: sending the daily verse email</li>
-          <li><strong>RevenueCat, Apple App Store, and Google Play</strong>: in-app purchases and subscription management</li>
+          <li><strong>Apple App Store</strong>: in-app purchases and subscription management</li>
           <li><strong>Apple Push Notification service and Google Firebase Cloud Messaging</strong>: delivering push notifications</li>
           <li><strong>bolls.life and bible-api.com</strong>: providing Bible text (no personal data is sent to them)</li>
         </ul>
