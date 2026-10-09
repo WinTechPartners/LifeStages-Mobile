@@ -247,7 +247,7 @@ function SubscriptionContent() {
                         <span className="text-sm text-gray-500">/year</span>
                       </div>
                       <p className="text-xs text-green-600 font-medium mt-1">
-                        Just {yearlyMonthly}/month — 3 months FREE!
+                        Just {yearlyMonthly}/month — Save with annual billing
                       </p>
                     </div>
                   )}
@@ -364,7 +364,7 @@ function SubscriptionContent() {
               </span>
               <span className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">verified</span>
-                Verified by {typeof window !== "undefined" && /android/i.test(navigator.userAgent) ? "Google" : "Apple"}
+                {canStartTrial ? "Secure checkout" : "Verified by Apple"}
               </span>
             </div>
           </div>
