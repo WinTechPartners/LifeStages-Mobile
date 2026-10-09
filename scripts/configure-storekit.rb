@@ -13,7 +13,10 @@ Dir[File.join(root, 'native/ios/*.swift')].each do |source|
   ref = group.files.find { |f| f.path == file } || group.new_file(file)
   target.source_build_phase.add_file_reference(ref, true)
 end
-target.build_configurations.each { |c| c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0' }
+target.build_configurations.each do |c|
+  c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+  c.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.bibleforlifestages'
+end
 project.save
 storyboard = File.join(app, 'Base.lproj/Main.storyboard')
 text = File.read(storyboard)
