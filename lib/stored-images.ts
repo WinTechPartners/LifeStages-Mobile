@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { cacheSet } from './content-cache'
+import { cacheGet, cacheSet } from './content-cache'
 import { queryOne } from './db'
 
 type StoredImage = { contentType: string; base64: string }
@@ -10,6 +10,10 @@ export function imageIdFromUrl(source: string): string | null {
 }
 export async function readStoredImage(id: string): Promise<StoredImage | null> {
   if (!/^[a-f0-9]{64}$/.test(id)) return null
+  // Use the same normalized, policy-versioned key as cacheSet.
+  const current = await cacheGet<StoredImage>('image-file', { id })
+  if (current) return current
+  // Images already referenced by older app builds retain their original URLs.
   const row = await queryOne<{ payload: StoredImage }>('SELECT payload FROM cached_content WHERE content_type = $1 AND cache_key = $2', ['image-file', JSON.stringify({ id })])
   return row?.payload || null
 }
