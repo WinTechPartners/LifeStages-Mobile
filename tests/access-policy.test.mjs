@@ -25,7 +25,7 @@ test('only an active subscription or the explicit owner email enables premium',a
   assert.equal(result.ageRange,'65+');assert.equal(result.__personalizationAuthorized,true)
 })
 test('generic content has neutral instructions and a separate cache from paid profiles',()=>{
-  const api=load('content-policy.ts',{'@/lib/cultural-context':{getCountryForLanguage:()=> 'United States'}})
+  const api=load('content-policy.ts',{'@/lib/cultural-context':load('cultural-context.ts')})
   const free=api.normalizeProfile({ageRange:'65+',gender:'female',stageSituation:'Transitions'})
   const paid=api.normalizeProfile({__personalizationAuthorized:true,ageRange:'65+',gender:'female',stageSituation:'Transitions'})
   assert.match(api.readerInstruction(free),/Do not tailor to age, gender/)
@@ -44,7 +44,7 @@ test('images fail closed when text detection is unavailable',async()=>{
 })
 
 test('English-only requests ignore old language preferences while retaining paid country context',()=>{
-  const api=load('content-policy.ts',{'@/lib/cultural-context':{getCountryForLanguage:()=> 'United States'}})
+  const api=load('content-policy.ts',{'@/lib/cultural-context':load('cultural-context.ts')})
   const p=api.normalizeProfile({__personalizationAuthorized:true,language:'vi',profile:{language:'es',country:'Vietnam'}})
   assert.equal(p.language,'en');assert.equal(p.country,'Vietnam');assert.match(api.readerInstruction(p),/content in English/)
   assert.equal(api.normalizeProfile({language:'es'}).language,'en')
