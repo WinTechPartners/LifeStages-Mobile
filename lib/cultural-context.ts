@@ -14,6 +14,14 @@
 // Env (Railway): CULTURESYNC_API_URL (default https://theculturalsync.com),
 //                CULTURESYNC_API_KEY (X-API-Key, only needed if that API enables auth).
 
+const COUNTRY_NAMES: Record<string, string> = {
+ US: 'United States', CA: 'Canada', GB: 'United Kingdom', AU: 'Australia', NZ: 'New Zealand', PH: 'Philippines', NG: 'Nigeria', KE: 'Kenya', ZA: 'South Africa', GH: 'Ghana', IN: 'India', SG: 'Singapore', MY: 'Malaysia', MX: 'Mexico', BR: 'Brazil', CO: 'Colombia', AR: 'Argentina', DE: 'Germany', FR: 'France', NL: 'Netherlands', KR: 'South Korea', JP: 'Japan', VN: 'Vietnam'
+}
+export function normalizeCountry(value: unknown): string {
+ const country = typeof value === 'string' ? value.trim() : ''
+ if (!country || country.toUpperCase() === 'OTHER') return ''
+ return COUNTRY_NAMES[country.toUpperCase()] || Object.values(COUNTRY_NAMES).find(name => name.toLowerCase() === country.toLowerCase()) || country
+}
 const LANGUAGE_TO_COUNTRY: Record<string, string> = {
   vi: "Vietnam",
   en: "United States",
@@ -121,17 +129,16 @@ async function fetchSensitivityNorms(country: string): Promise<string> {
  * Full cultural brief for a language, cached per country for 6 hours.
  * Returns "" for English so English content is unchanged.
  */
-export async function getCulturalBrief(language?: string | null): Promise<string> {
+export async function getCulturalBrief(language?: string | null, selectedCountry?: string | null): Promise<string> {
   const lang = (language || "en").toLowerCase()
-  if (lang === "en") return ""
-  const country = LANGUAGE_TO_COUNTRY[lang]
+  const country = normalizeCountry(selectedCountry)
   if (!country) return ""
 
   const hit = cache.get(country)
   if (hit && hit.expires > Date.now()) return hit.brief
 
   const storytelling =
-    STORYTELLING[lang] ||
+    STORYTELLING[Object.keys(LANGUAGE_TO_COUNTRY).find(code => LANGUAGE_TO_COUNTRY[code] === country) || lang] ||
     `SETTING AND PEOPLE: Set everything in ${country}, with local names, places, daily life, and faith context. Image prompts must depict ${country} people and places.`
   const norms = await fetchSensitivityNorms(country)
   const brief = norms
@@ -146,12 +153,12 @@ export async function getCulturalBrief(language?: string | null): Promise<string
 /**
  * Prompt block to append to a system prompt. Empty for English.
  */
-export async function culturalInstruction(language?: string | null): Promise<string> {
-  const brief = await getCulturalBrief(language)
+export async function culturalInstruction(language?: string | null, selectedCountry?: string | null): Promise<string> {
+  const brief = await getCulturalBrief(language, selectedCountry)
   if (!brief) return ""
   return `
 
-CULTURAL GROUNDING (mandatory): The reader lives in this culture. Do not write from an American backdrop.
+CULTURAL GROUNDING (mandatory): The reader lives in this culture. Ground examples, metaphors, fictional characters, song lyrics and visual scenes in their selected country. Write the prose and lyrics in English; local proper names are appropriate. Describe local people and the country explicitly in every image prompt. Use ordinary contemporary life rather than tourist clichés.
 ${brief}
 
 Apply these as defaults, never as stereotypes. Individuals vary; the culture is the setting, not a caricature.`

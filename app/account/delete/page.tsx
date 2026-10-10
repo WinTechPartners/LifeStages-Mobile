@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useSubscription } from "@/context/subscription-context"
-import { apiFetch } from "@/lib/api-base"
+import { apiUrl } from "@/lib/api-base"
 import { eraseAllAnalytics } from "@/lib/analytics/client"
 
 export default function DeleteAccountPage() {
@@ -14,7 +14,10 @@ export default function DeleteAccountPage() {
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const emailMatch = confirmEmail.toLowerCase().trim() === (userEmail || "").toLowerCase().trim()
+  const [link, setLink] = useState<{email:string;token:string}|null>(null)
+  useEffect(() => { const params = new URLSearchParams(window.location.search); const email=params.get('email'), token=params.get('token'); if(email && token) { setLink({email,token}); setConfirmEmail(email); setStep('confirm') } }, [])
+  const accountEmail = link?.email || userEmail || ''
+  const emailMatch = confirmEmail.toLowerCase().trim() === accountEmail.toLowerCase().trim()
 
   async function handleDelete() {
     if (!emailMatch) return
@@ -24,12 +27,13 @@ export default function DeleteAccountPage() {
     try {
       // Keep the local deletion identifiers until the server confirms erasure.
       await eraseAllAnalytics()
-      const res = await apiFetch("/api/account/delete", {
+      const res = await fetch(apiUrl("/api/account/delete"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: userEmail }),
+        body: JSON.stringify({ email: accountEmail, token: link?.token }),
       })
 
+      if (!res.headers.get('content-type')?.includes('application/json')) throw new Error('The account-deletion service is unavailable. Please retry or contact info@wintechpartners.com.')
       const data = await res.json()
       if (!data.success) throw new Error(data.error || "Deletion failed")
 
@@ -37,7 +41,7 @@ export default function DeleteAccountPage() {
       localStorage.clear()
       setStep("done")
     } catch (err: any) {
-      setError(err?.message || "Something went wrong. Please try again or contact Support@BibleForLifeStages.com")
+      setError(err?.message || "Something went wrong. Please try again or contact info@wintechpartners.com")
     } finally {
       setDeleting(false)
     }
@@ -134,7 +138,7 @@ export default function DeleteAccountPage() {
             <div className="space-y-2">
               <label className="text-sm text-blue-200/50">Your email</label>
               <div className="text-sm text-white/60 bg-white/5 rounded-lg px-4 py-3">
-                {userEmail || "No email on file"}
+                {accountEmail || "No email on file"}
               </div>
             </div>
 
@@ -142,6 +146,9 @@ export default function DeleteAccountPage() {
               <label className="text-sm text-blue-200/50">Type your email to confirm</label>
               <input
                 type="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoComplete="email"
                 value={confirmEmail}
                 onChange={(e) => setConfirmEmail(e.target.value)}
                 placeholder="Enter your email address"

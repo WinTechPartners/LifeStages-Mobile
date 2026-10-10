@@ -1,16 +1,14 @@
-import { entitlementProfile } from '@/lib/entitlements'
+import { entitlementProfile, hasPremium } from '@/lib/entitlements'
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
-import { buildPersonalizationContext } from "@/lib/personalization-prompts"
+import { normalizeProfile, readerInstruction } from "@/lib/content-policy"
+import { culturalInstruction } from "@/lib/cultural-context"
 
 export async function POST(request: Request) {
   try {
-    const { verseReference, verseText, ageRange, gender, stageSituation, source, sermonTitle, sermonSummary } = await entitlementProfile(await request.json())
-
-    // Determine if this is sermon-based or verse-based
-    const isSermonMode = source === 'sermon' && sermonTitle
-    const contentReference = isSermonMode ? `the sermon "${sermonTitle}"` : verseReference
-    const contentText = isSermonMode ? sermonSummary : verseText
+    const body = await entitlementProfile(await request.json())
+    const { verseReference, verseText } = body
+    const p = normalizeProfile(body)
 
     const openrouter = createOpenRouter({
       apiKey: process.env.OPENROUTER_API_KEY!,
@@ -18,14 +16,14 @@ export async function POST(request: Request) {
 
     const modelId = (process.env.OPENROUTER_MODEL_ID || "anthropic/claude-sonnet-4-20250514").trim()
 
-    const personalization = buildPersonalizationContext(ageRange, gender, stageSituation)
+    const personalization = readerInstruction(p) + await culturalInstruction(p.language, p.personalized ? p.country : undefined)
 
     const systemInstruction = `You are a gifted poet who writes beautiful, emotionally resonant poetry. Your poems have proper structure with line breaks, stanzas, and poetic rhythm. Write in a warm, accessible style that touches the heart.${personalization}`
 
     const poem1Promise = generateText({
       model: openrouter(modelId),
       system: systemInstruction,
-      prompt: `Generate 1 beautiful SONNET or HYMN STYLE poem inspired by ${contentReference}: "${contentText}"
+      prompt: `Generate 1 beautiful SONNET or HYMN STYLE poem inspired by ${verseReference}: "${verseText}"
       
       Write a REAL POEM with proper poetic structure:
       - 8-16 lines total
@@ -50,7 +48,7 @@ export async function POST(request: Request) {
     const poem2Promise = generateText({
       model: openrouter(modelId),
       system: systemInstruction,
-      prompt: `Generate 1 beautiful FREE VERSE poem inspired by ${contentReference}: "${contentText}"
+      prompt: `Generate 1 beautiful FREE VERSE poem inspired by ${verseReference}: "${verseText}"
       
       Write a REAL POEM with proper poetic structure:
       - 8-16 lines total

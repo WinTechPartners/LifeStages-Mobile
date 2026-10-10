@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     // Check cache first
     const accessCacheKey = {...cacheKey, country:policyProfile.country, content_style, personalized:policyProfile.personalized, circumstances:policyProfile.lifeCircumstances.join("|")}
-    const cached = await cacheGet<any>('devotional-v3', accessCacheKey)
+    const cached = await cacheGet<any>('devotional-v4-country', accessCacheKey)
     
     if (cached) {
       const originalImage = cached.image_url
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
     const languageInstruction = language !== 'en' 
       ? `IMPORTANT: Write the ENTIRE response in ${getLanguageName(language)}. Do not use English.`
       : ''
-    const culturalNote = (await culturalInstruction(language)) + readerInstruction(policyProfile)
+    const culturalNote = (await culturalInstruction(language, policyProfile.personalized ? policyProfile.country : undefined)) + readerInstruction(policyProfile)
 
     const prompt = policyProfile.personalized ? `You are creating a personalized devotional for someone who is:
 - Age: ${ageContext}
@@ -209,7 +209,7 @@ Return JSON only: reflection (2-3 paragraphs of Friendly Breakdown), application
 
     console.log('[API] New devotional saved to Supabase cache:', savedDevotional?.id)
 
-    await cacheSet('devotional-v3', accessCacheKey, {verse_reference, verse_text, reflection:content.reflection, application:content.application, prayer:content.prayer, image_url, audio_url:null})
+    await cacheSet('devotional-v4-country', accessCacheKey, {verse_reference, verse_text, reflection:content.reflection, application:content.application, prayer:content.prayer, image_url, audio_url:null})
     return NextResponse.json({
       cache_hit: false,
       devotional: {

@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const { verseReference, verseText, poemType } = body
     const p = normalizeProfile(body)
     const language = p.language
-    const cultural = (await culturalInstruction(language)) + readerInstruction(p)
+    const cultural = (await culturalInstruction(language, p.personalized ? p.country : undefined)) + readerInstruction(p)
     const cacheKey = policyKey(p, { verse: verseReference, poemType })
     const hit = await cacheGet("poem", cacheKey)
     if (hit) return Response.json(hit)

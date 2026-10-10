@@ -6,7 +6,7 @@ import { loadContentExtras } from "@/lib/content-loader"
 import React, { createContext, useContext, useState, type ReactNode, useCallback, useRef } from "react"
 import { useLanguage } from "./language-context"
 import { useSubscription } from "./subscription-context"
-import { apiUrl } from "@/lib/api-base"
+import { apiUrl, apiFetch } from "@/lib/api-base"
 import { useChurch } from "./church-context"
 
 export interface VerseData {
@@ -131,6 +131,7 @@ const initialLoadingStates: LoadingStates = {
 }
 
 interface UserProfile {
+  country?: string
   email?: string | null
   personalized?: boolean
   ageRange: string
@@ -171,6 +172,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
         const parsed = JSON.parse(savedProfile)
         return {
           email: userEmail || parsed.email,
+          country: canAccessPremium ? parsed.country : undefined,
           personalized: canAccessPremium,
           lifeCircumstances: canAccessPremium ? normalizeLifeCircumstances(parsed.lifeCircumstances) : [],
           ageRange: canAccessPremium ? parsed.ageBand || parsed.ageRange || "40-54" : "40-54",
@@ -256,12 +258,13 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
    */
   const getDevotionalContent = useCallback(async (verse: VerseData, profile: UserProfile): Promise<DevotionalData | null> => {
     try {
-      const response = await fetch(apiUrl("/api/devotional"), {
+      const response = await apiFetch("/api/devotional", {
         signal: AbortSignal.timeout(45000),
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: profile.email,
+          country: profile.country,
           verse_reference: verse.reference,
           verse_text: verse.text,
           age_range: profile.ageRange,
@@ -322,7 +325,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
     }
     
     const profile = getFreshProfile()
-    const cacheKey = JSON.stringify(["access-web-v1", profile.personalized, "text-free-v3", source, profile.churchId, profile.ageRange, profile.gender, profile.stageSituation, profile.lifeCircumstances, profile.language, profile.contentStyle])
+    const cacheKey = JSON.stringify(["access-web-v2-country", profile.personalized, "text-free-v3", source, profile.churchId, profile.ageRange, profile.gender, profile.country, profile.stageSituation, profile.lifeCircumstances, profile.language, profile.contentStyle])
     
     // If we already loaded this exact combination, skip
     if (lastLoadedKeyRef.current === cacheKey && devotional.verse) {

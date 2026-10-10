@@ -43,7 +43,7 @@ Lyrics: Wisdom, gratitude, peace in the journey`,
 
     const style = styleGuide[ageRange] || styleGuide.adult
     const langNote = language !== "en" ? ` Write lyrics in ${getLanguageName(language)}.` : ""
-    const cultural = (await culturalInstruction(language)) + readerInstruction(p)
+    const cultural = (await culturalInstruction(language, p.personalized ? p.country : undefined)) + readerInstruction(p)
     const cacheKey = policyKey(p, { verse: verseReference })
     const hit = await cacheGet("songs", cacheKey)
     if (hit) return Response.json(hit)

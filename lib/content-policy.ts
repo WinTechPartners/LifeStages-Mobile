@@ -1,5 +1,5 @@
 import { normalizeLifeCircumstances, LIFE_CIRCUMSTANCES } from "./life-circumstances"
-import { getCountryForLanguage } from "@/lib/cultural-context"
+import { getCountryForLanguage, normalizeCountry } from "@/lib/cultural-context"
 
 // Content policy: the inputs every generation is allowed to vary on.
 //
@@ -43,7 +43,7 @@ export function normalizeProfile(input: Record<string, unknown> | null | undefin
   return {
     lifeCircumstances: personalized ? normalizeLifeCircumstances(src.lifeCircumstances || nested.lifeCircumstances) : [],
     language,
-    country: personalized ? String(src.country || nested.country || getCountryForLanguage(language) || "United States") : getCountryForLanguage(language) || "United States",
+    country: personalized ? normalizeCountry(src.country || nested.country) || "United States" : getCountryForLanguage(language) || "United States",
     personalized,
     gender,
     ageRange: personalized ? String(src.ageRange || src.age_range || nested.ageRange || "40-54") : POLICY.ageRange,
@@ -57,7 +57,7 @@ export function policyKey(
   p: ContentProfile,
   extra: Record<string, string | number | boolean | null | undefined> = {}
 ): Record<string, string | number | boolean | null | undefined> {
-  return { accessPolicy: "v3", personalized: p.personalized, language: p.language, country: p.country, gender: p.personalized ? p.gender : "generic", ageRange: p.ageRange, stageSituation: p.stageSituation, contentStyle: p.contentStyle, circumstances: p.lifeCircumstances?.join("|") || "", ...extra }
+  return { accessPolicy: "v4-country", personalized: p.personalized, language: p.language, country: p.country, gender: p.personalized ? p.gender : "generic", ageRange: p.ageRange, stageSituation: p.stageSituation, contentStyle: p.contentStyle, circumstances: p.lifeCircumstances?.join("|") || "", ...extra }
 }
 
 /** Prompt block describing the reader, appended to every generation system prompt. */

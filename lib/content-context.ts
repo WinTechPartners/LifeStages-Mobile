@@ -10,9 +10,9 @@ export function contentCacheKey(module: string, contentId: string, churchId?: st
     const saved = JSON.parse(localStorage.getItem('userProfile') || '{}')
     if (saved && typeof saved === 'object' && !Array.isArray(saved)) profile = saved
   } catch { /* empty profile */ }
-  return `content_web_v1:${JSON.stringify([
+  return `content_web_v2_country:${JSON.stringify([
     localStorage.getItem("lifestages-access") || "free", module, contentId, churchId || profile.churchId || 'unaffiliated',
-    profile.ageRange || profile.age || 'adult',
+    profile.ageRange || profile.age || 'adult', profile.country || '', profile.gender || '', profile.lifeCircumstances || [],
     language || profile.language || 'en',
     profile.stageSituation || profile.lifeStage || '', profile.contentStyle || 'casual',
   ])}`

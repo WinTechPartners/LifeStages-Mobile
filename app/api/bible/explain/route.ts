@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 
     const langName = language !== "en" ? getLanguageName(language) : null
     const langNote = langName ? ` Respond entirely in ${langName}. Do not use English.` : ""
-    const cultural = (await culturalInstruction(language)) + readerInstruction(p)
+    const cultural = (await culturalInstruction(language, p.personalized ? p.country : undefined)) + readerInstruction(p)
 
     // Same highlighted text and reference -> same explanation for everyone in that language, country, and gender
     const cacheKey = policyKey(p, { text: selectedText, reference })
