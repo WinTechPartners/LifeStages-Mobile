@@ -153,13 +153,13 @@ export async function getCulturalBrief(language?: string | null, selectedCountry
 /**
  * Prompt block to append to a system prompt. Empty for English.
  */
-export async function culturalInstruction(language?: string | null, selectedCountry?: string | null): Promise<string> {
+export async function culturalInstruction(language?: string | null, selectedCountry?: string | null, includeImages = true): Promise<string> {
   const brief = await getCulturalBrief(language, selectedCountry)
   if (!brief) return ""
   return `
 
-CULTURAL GROUNDING (mandatory): The reader lives in this culture. Ground examples, metaphors, fictional characters, song lyrics and visual scenes in their selected country. Write the prose and lyrics in English; local proper names are appropriate. Describe local people and the country explicitly in every image prompt. Use ordinary contemporary life rather than tourist clichés.
-${brief}
+CULTURAL GROUNDING (mandatory): The reader lives in this culture. Ground examples and metaphors in their selected country. Write the prose and lyrics in English; local proper names are appropriate. ${includeImages ? 'Ground fictional characters, song lyrics and visual scenes in this country. Describe local people and the country explicitly in every image prompt.' : 'This is a text-only explanation.'} Use ordinary contemporary life rather than tourist clichés.
+${includeImages ? brief : brief.split('\n').filter(line => !/image prompts?/i.test(line)).join('\n')}
 
 Apply these as defaults, never as stereotypes. Individuals vary; the culture is the setting, not a caricature.`
 }

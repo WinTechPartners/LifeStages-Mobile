@@ -48,10 +48,10 @@ export async function POST(request: Request) {
 
     const langName = language !== "en" ? getLanguageName(language) : null
     const langNote = langName ? ` Respond entirely in ${langName}. Do not use English.` : ""
-    const cultural = (await culturalInstruction(language, p.personalized ? p.country : undefined)) + readerInstruction(p)
+    const cultural = (await culturalInstruction(language, p.personalized ? p.country : undefined, false)) + readerInstruction(p)
 
     // Same highlighted text and reference -> same explanation for everyone in that language, country, and gender
-    const cacheKey = policyKey(p, { text: selectedText, reference })
+    const cacheKey = policyKey(p, { text: selectedText, reference, format: 'brief-text-only-v1' })
     const hit = await cacheGet<{ explanation: string }>("explain", cacheKey)
     if (hit?.explanation) return Response.json(hit)
 
@@ -68,7 +68,9 @@ STYLE:
 - No churchy jargon or "thee/thou" language
 - Connect abstract concepts to real life
 - Keep it warm and encouraging, never preachy
-- 100-150 words max`,
+- 100-150 words max
+- Return only the short explanation in English, as ordinary prose
+- No image prompts, artwork directions, technical fields, headings, or additional sections`,
       prompt: `The user highlighted this from ${reference}:
 
 "${selectedText}"
@@ -83,8 +85,12 @@ Give a friendly, plain-language explanation of what this means${langName ? ` (in
       return Response.json({ error: "Empty response from AI" }, { status: 500 })
     }
 
-    await cacheSet("explain", cacheKey, { explanation: text.trim() })
-    return Response.json({ explanation: text.trim() })
+    // Never display generation metadata if a provider appends it despite the
+    // text-only contract. Keep the explanation before a labeled image section.
+    const explanation = text.split(/(?:\r?\n|\*\*)\s*(?:\*\*)?(?:image[\s_-]*prompt|heroImagePrompt|artwork\s+(?:prompt|directions))\s*[:=]/i)[0].trim()
+    if (!explanation) return Response.json({error:'Please try the explanation again.'},{status:502})
+    await cacheSet("explain", cacheKey, { explanation })
+    return Response.json({ explanation })
   } catch (error) {
     console.error("[Explain API] Error details:", error)
     const errorMessage = error instanceof Error ? error.message : "Unknown error"

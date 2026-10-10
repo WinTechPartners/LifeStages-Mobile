@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     // Check cache first
     const accessCacheKey = {...cacheKey, country:policyProfile.country, content_style, personalized:policyProfile.personalized, circumstances:policyProfile.lifeCircumstances.join("|")}
-    const cached = await cacheGet<any>('devotional-v4-country', accessCacheKey)
+    const cached = await cacheGet<any>('devotional-v5-country-english', accessCacheKey)
     
     if (cached) {
       const originalImage = cached.image_url
@@ -172,6 +172,7 @@ Return JSON only: reflection (2-3 paragraphs of Friendly Breakdown), application
 
     const { text } = await generateText({
       model: openrouter(MODEL_ID),
+      system: 'Write every JSON text field in English. The selected profile country controls cultural setting, people and examples, never the output language. Translate local expressions into English; local proper names may retain their spelling.',
       prompt,
       maxOutputTokens: 2500,
       abortSignal: AbortSignal.timeout(30000),
@@ -209,7 +210,7 @@ Return JSON only: reflection (2-3 paragraphs of Friendly Breakdown), application
 
     console.log('[API] New devotional saved to Supabase cache:', savedDevotional?.id)
 
-    await cacheSet('devotional-v4-country', accessCacheKey, {verse_reference, verse_text, reflection:content.reflection, application:content.application, prayer:content.prayer, image_url, audio_url:null})
+    await cacheSet('devotional-v5-country-english', accessCacheKey, {verse_reference, verse_text, reflection:content.reflection, application:content.application, prayer:content.prayer, image_url, audio_url:null})
     return NextResponse.json({
       cache_hit: false,
       devotional: {
