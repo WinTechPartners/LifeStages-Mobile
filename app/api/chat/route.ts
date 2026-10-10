@@ -1,11 +1,16 @@
-import { webPassage } from '@/lib/web-scripture'
+import { entitlementProfile } from '@/lib/entitlements'
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
 
 export async function POST(req: Request) {
   try {
-    const { message, verseReference, history } = await req.json()
-    const verseText = (await webPassage(verseReference)).text
+    const body = await req.json()
+    if (typeof body.message !== 'string' || !body.message.trim()) return Response.json({error: 'A message is required'}, {status: 400})
+    // General chat has no passage to resolve. Never interpret a screen title as Scripture.
+    const generalChat = !body.verseReference || body.verseReference === 'General' || body.source === 'sermon'
+    const resolved = await entitlementProfile(generalChat ? {...body, verseReference: undefined, verseText: ''} : body)
+    if (!resolved.__personalizationAuthorized) return Response.json({error: 'Text Chat requires Premium'}, {status: 403})
+    const { message, verseReference, verseText, history } = resolved
 
     const openrouter = createOpenRouter({
       apiKey: process.env.OPENROUTER_API_KEY!,
@@ -13,7 +18,7 @@ export async function POST(req: Request) {
 
     const modelId = (process.env.OPENROUTER_MODEL_ID || "anthropic/claude-sonnet-4-20250514").trim()
 
-    const systemPrompt = `You are a helpful, empathetic Bible study assistant. You are discussing the verse: ${verseReference} ("${verseText}"). 
+    const systemPrompt = `You are a helpful, empathetic Bible study assistant. ${verseReference ? `You are discussing the verse: ${verseReference} ("${verseText}").` : 'No specific Bible passage is selected. Discuss the user’s question without inventing a selected verse.'}${body.isDeepDive && typeof body.deepDiveTopic === 'string' ? ` The selected Lifeline topic is: ${body.deepDiveTopic}.` : ''} 
 
 Guidelines:
 - Keep responses concise (under 100 words) and conversational
