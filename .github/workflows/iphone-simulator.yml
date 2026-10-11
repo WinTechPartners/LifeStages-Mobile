@@ -26,6 +26,7 @@ jobs:
   android:
     if: ${{ inputs.android_release }}
     uses: ./.github/workflows/android-release.yml
+    secrets: inherit
   simulator:
     if: ${{ !inputs.signed_release && !inputs.android_release }}
     runs-on: macos-26

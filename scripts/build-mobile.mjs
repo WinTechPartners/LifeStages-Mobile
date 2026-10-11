@@ -24,4 +24,8 @@ if (!fs.existsSync(path.join(stage, 'out', 'index.html'))) throw new Error('Mobi
 const output = path.join(root, 'out')
 if (fs.existsSync(output)) fs.renameSync(output, path.join(root, `.mobile-out-backup-${Date.now()}`))
 fs.cpSync(path.join(stage, 'out'), output, { recursive: true })
+if (process.env.ANDROID_NATIVE_BUILD === '1') {
+  const { prepareAndroidWebView } = await import('./prepare-android-webview.mjs')
+  await prepareAndroidWebView(root, output)
+}
 console.log(`Locally bundled mobile UI is ready at ${output}`)

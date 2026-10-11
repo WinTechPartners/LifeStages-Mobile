@@ -13,8 +13,7 @@ jobs:
       NEXT_PUBLIC_API_BASE_URL: https://www.bibleforlifestages.com
       NEXT_TELEMETRY_DISABLED: '1'
       ANDROID_VERSION_CODE: ${{ github.run_number }}
-      ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_NATIVE_BUILD: '1'
       ANDROID_KEY_ALIAS: lifestages-upload
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +42,8 @@ jobs:
         working-directory: android
         env:
           ANDROID_UPLOAD_KEY_BASE64: ${{ secrets.ANDROID_UPLOAD_KEY_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           test -n "$ANDROID_UPLOAD_KEY_BASE64" || { echo 'Android upload signing key is missing'; exit 1; }
           export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/lifestages-upload.jks"
