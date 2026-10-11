@@ -1,11 +1,21 @@
 name: LifeStages Android release
 on:
   workflow_dispatch:
+    inputs:
+      reuse_build_run:
+        type: string
+        default: ''
   workflow_call:
+    inputs:
+      reuse_build_run:
+        type: string
+        default: ''
 permissions:
   contents: read
+  actions: read
 jobs:
   build:
+    if: ${{ !inputs.reuse_build_run }}
     runs-on: ubuntu-latest
     environment: android-release
     timeout-minutes: 35
@@ -64,3 +74,37 @@ jobs:
         with:
           name: LifeStages-Android-Build-Reports
           path: android/app/build/reports
+  phone-smoke:
+    needs: build
+    if: ${{ always() && (needs.build.result == 'success' || inputs.reuse_build_run != '') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [30, 35]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: LifeStages-Android-Test-APK
+          path: test-apk
+          run-id: ${{ inputs.reuse_build_run || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_5
+          script: python3 scripts/android-phone-smoke.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: LifeStages-Android-Phone-API-${{ matrix.api }}
+          path: build/android-phone

@@ -9,6 +9,10 @@ on:
         description: Build the isolated Android release instead of iOS
         type: boolean
         default: false
+      android_reuse_build_run:
+        description: Existing Android build run to reuse for cloud-phone checks
+        type: string
+        default: ''
       signed_release:
         description: Build a signed real-iPhone release instead of the simulator
         type: boolean
@@ -19,6 +23,7 @@ on:
         default: false
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: lifestages-iphone-${{ github.ref }}
   cancel-in-progress: true
@@ -27,6 +32,8 @@ jobs:
     if: ${{ inputs.android_release }}
     uses: ./.github/workflows/android-release.yml
     secrets: inherit
+    with:
+      reuse_build_run: ${{ inputs.android_reuse_build_run || '' }}
   simulator:
     if: ${{ !inputs.signed_release && !inputs.android_release }}
     runs-on: macos-26
