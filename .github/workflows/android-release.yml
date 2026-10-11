@@ -7,11 +7,15 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: android-release
     timeout-minutes: 35
     env:
       NEXT_PUBLIC_API_BASE_URL: https://www.bibleforlifestages.com
       NEXT_TELEMETRY_DISABLED: '1'
       ANDROID_VERSION_CODE: ${{ github.run_number }}
+      ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_KEY_ALIAS: lifestages-upload
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,16 +41,22 @@ jobs:
           node scripts/configure-android.mjs
       - name: Build installable testing APK and release bundle
         working-directory: android
+        env:
+          ANDROID_UPLOAD_KEY_BASE64: ${{ secrets.ANDROID_UPLOAD_KEY_BASE64 }}
         run: |
+          test -n "$ANDROID_UPLOAD_KEY_BASE64" || { echo 'Android upload signing key is missing'; exit 1; }
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/lifestages-upload.jks"
+          printf '%s' "$ANDROID_UPLOAD_KEY_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
           chmod +x gradlew
           ./gradlew assembleDebug bundleRelease lintDebug --stacktrace
+          jarsigner -verify app/build/outputs/bundle/release/app-release.aab
       - uses: actions/upload-artifact@v4
         with:
           name: LifeStages-Android-Test-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: LifeStages-Android-Unsigned-AAB
+          name: LifeStages-Android-Signed-AAB
           path: android/app/build/outputs/bundle/release/app-release.aab
       - uses: actions/upload-artifact@v4
         if: always()
