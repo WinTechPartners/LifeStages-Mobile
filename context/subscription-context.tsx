@@ -15,6 +15,7 @@ import {
   type IAPSubscriptionInfo,
   type SubscriptionStatus,
   PRODUCT_IDS,
+  getProductIds,
 } from "@/lib/native-iap"
 
 type SubscriptionTier = "free" | "trial" | "premium"
@@ -269,7 +270,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
   // Purchase a product via native IAP
   const purchase = useCallback(async (productId: string): Promise<boolean> => {
-    if (!isNative()) { await webCheckout(productId === PRODUCT_IDS.YEARLY ? "yearly" : "monthly"); return false }
+    if (!isNative()) { await webCheckout(productId === getProductIds().YEARLY ? "yearly" : "monthly"); return false }
     try {
       const success = await purchaseProduct(productId)
       if (success) {
@@ -306,7 +307,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   // Legacy compatibility — these map to native IAP now
   const checkout = useCallback(async (priceType: "monthly" | "yearly", email?: string) => {
     if (!isNative()) { await webCheckout(priceType, email); return }
-    const productId = priceType === "yearly" ? PRODUCT_IDS.YEARLY : PRODUCT_IDS.MONTHLY
+    const productId = priceType === "yearly" ? getProductIds().YEARLY : getProductIds().MONTHLY
     await purchase(productId)
   }, [purchase, webCheckout])
 

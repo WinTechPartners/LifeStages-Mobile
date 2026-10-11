@@ -5,6 +5,10 @@ on:
     paths-ignore: ['docs/**', 'README.md']
   workflow_dispatch:
     inputs:
+      android_release:
+        description: Build the isolated Android release instead of iOS
+        type: boolean
+        default: false
       signed_release:
         description: Build a signed real-iPhone release instead of the simulator
         type: boolean
@@ -19,8 +23,11 @@ concurrency:
   group: lifestages-iphone-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  android:
+    if: ${{ inputs.android_release }}
+    uses: ./.github/workflows/android-release.yml
   simulator:
-    if: ${{ !inputs.signed_release }}
+    if: ${{ !inputs.signed_release && !inputs.android_release }}
     runs-on: macos-26
     timeout-minutes: 35
     env:

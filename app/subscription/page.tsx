@@ -4,9 +4,12 @@ import { useRouter } from "next/navigation"
 import { useSubscription } from "@/context/subscription-context"
 import { Card } from "@/components/ui/card"
 import { useState, useEffect, Suspense } from "react"
-import { PRODUCT_IDS } from "@/lib/native-iap"
+import { getProductIds } from "@/lib/native-iap"
+import { getPlatform } from "@/lib/native-features"
 
 function SubscriptionContent() {
+  const PRODUCT_IDS = getProductIds()
+  const storeName = getPlatform()==='android' ? 'Google Play' : 'Apple'
   const router = useRouter()
   const {
     canStartTrial,
@@ -291,7 +294,7 @@ function SubscriptionContent() {
             </Card>
 
             {!canStartTrial && !(selectedPlan === "annual" ? yearlyProduct : monthlyProduct) && (
-              <p role="status" className="text-sm text-amber-200">Apple has not loaded this plan yet. Tap Subscribe with Apple to retry.</p>
+              <p role="status" className="text-sm text-amber-200">{storeName} has not loaded this plan yet. Tap Subscribe with {storeName} to retry.</p>
             )}
 
             {/* CTA Button */}
@@ -300,7 +303,7 @@ function SubscriptionContent() {
               disabled={purchasing}
               className="w-full py-4 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 text-gray-900 rounded-xl font-bold text-lg shadow-xl active:scale-[0.98] transition-transform disabled:opacity-60"
             >
-              {purchasing ? "Processing..." : canStartTrial ? "Start FREE 7-Day Trial" : "Subscribe with Apple"}
+              {purchasing ? "Processing..." : canStartTrial ? "Start FREE 7-Day Trial" : `Subscribe with ${storeName}`}
             </button>
 
             <div className="flex items-center justify-center gap-4 text-xs">
@@ -317,7 +320,7 @@ function SubscriptionContent() {
               </span>
               <span className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">check_circle</span>
-                {canStartTrial ? "No charge for 7 days" : "Apple confirms the price before purchase"}
+                {canStartTrial ? "No charge for 7 days" : `${storeName} confirms the price before purchase`}
               </span>
             </div>
 
@@ -371,7 +374,7 @@ function SubscriptionContent() {
               </span>
               <span className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">verified</span>
-                {canStartTrial ? "Secure checkout" : "Verified by Apple"}
+                {canStartTrial ? "Secure checkout" : `Verified by ${storeName}`}
               </span>
             </div>
           </div>

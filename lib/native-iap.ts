@@ -1,7 +1,9 @@
 /** Direct Apple StoreKit 2 bridge. No billing intermediary or embedded signing key. */
 import { registerPlugin, Capacitor, type PluginListenerHandle } from '@capacitor/core'
 import { isNative, getPlatform } from './native-features'
+import { googleAvailable, googleProducts, googlePurchase, googleSubscription, GOOGLE_PRODUCT_IDS } from './google-native-iap'
 export const PRODUCT_IDS = { MONTHLY:'001', YEARLY:'com.bibleforlifestages.premium.yearly' } as const
+export const getProductIds = () => getPlatform()==='android' ? GOOGLE_PRODUCT_IDS : PRODUCT_IDS
 export type SubscriptionStatus = 'active' | 'trialing' | 'expired' | 'canceled' | 'none'
 export interface IAPProduct { id:string; title:string; description:string; price:string; priceAmount:number; currency:string; period:'monthly'|'yearly' }
 export interface IAPSubscriptionInfo { status:SubscriptionStatus; productId:string|null; expiresAt:number|null; isTrialing:boolean; willRenew:boolean }
@@ -29,21 +31,26 @@ function accept(value:AppleSubscription):IAPSubscriptionInfo {
   return result
 }
 export async function initializeIAP():Promise<boolean> {
+  if (getPlatform()==='android') return googleAvailable()
   return isNative() && getPlatform()==='ios' && Capacitor.isPluginAvailable('LifeStagesStoreKit')
 }
 export async function getProducts():Promise<IAPProduct[]> {
+  if (getPlatform()==='android') { try { return await googleProducts() } catch { return [] } }
   if (!await initializeIAP()) return []
   try { return (await store.getProducts()).products.filter(p=>known(p.id)) } catch { return [] }
 }
 export async function getSubscriptionInfo():Promise<IAPSubscriptionInfo> {
+  if (getPlatform()==='android') { try { return await googleSubscription() } catch { return empty() } }
   if (!await initializeIAP()) { signedTransaction=null; return empty() }
   try { return accept(await store.getSubscription()) } catch { signedTransaction=null; return empty() }
 }
 export async function restorePurchases():Promise<IAPSubscriptionInfo> {
+  if (getPlatform()==='android') return googleSubscription()
   if (!await initializeIAP()) return empty()
   return accept(await store.restore())
 }
 export async function purchaseProduct(productId:string):Promise<boolean> {
+  if (getPlatform()==='android') return googlePurchase(productId)
   if (!known(productId)) throw Error('This subscription plan is unavailable.')
   if (!await initializeIAP()) throw Error('Apple billing is unavailable in this app build. Update LifeStages in TestFlight and try again.')
   // Prevent charging anyone before the hosted personalization verifier is configured.
@@ -56,6 +63,7 @@ export async function purchaseProduct(productId:string):Promise<boolean> {
   return true
 }
 export async function listenForSubscriptionChanges(listener:()=>void):Promise<()=>void> {
+  if (getPlatform()==='android') return ()=>{}
   if (!await initializeIAP()) return ()=>{}
   const handle=await store.addListener('subscriptionChanged', value=>{accept(value);listener()})
   return ()=>{void handle.remove()}

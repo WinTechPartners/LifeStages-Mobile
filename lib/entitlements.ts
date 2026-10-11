@@ -1,5 +1,6 @@
 import { webPassage } from './web-scripture'
 import { hasApplePremium } from './apple-iap-server'
+import { hasGooglePremium } from './google-iap-server'
 import { authorizedWarmup } from "./warmup-auth"
 import { normalizeLifeCircumstances } from "./life-circumstances"
 import { getSubscriptionByEmail } from '@/lib/supabase'
@@ -31,7 +32,7 @@ export async function entitlementProfile(input: Record<string, any>): Promise<Re
   const email = input.email || input.profile?.email || input.userProfile?.email
   const supplied = typeof input.__warmupSecret === "string" ? input.__warmupSecret : ""
   const trustedWarmup = authorizedWarmup(supplied)
-  const personalized = trustedWarmup ? input.profile?.personalized === true : (await hasApplePremium(input.appleTransaction) || await hasPremium(email))
+  const personalized = trustedWarmup ? input.profile?.personalized === true : (await hasApplePremium(input.appleTransaction) || await hasGooglePremium(input.googlePurchaseToken) || await hasPremium(email))
   const source = input.profile || input.userProfile || input
   const profile = personalized ? {
     ageRange: source.ageBand || source.ageRange || input.age_range || '40-54',
@@ -41,7 +42,7 @@ export async function entitlementProfile(input: Record<string, any>): Promise<Re
     contentStyle: source.contentStyle || input.content_style || 'casual',
     country: source.country || input.country,
   } : { lifeCircumstances: [], ageRange: '40-54', gender: 'male', stageSituation: 'General', contentStyle: 'casual', fullName: undefined, country: undefined }
-  const { appleTransaction: _receipt, ...safeInput } = input
+  const { appleTransaction: _receipt, googlePurchaseToken: _googleReceipt, ...safeInput } = input
   return { ...safeInput, ...profile, language: "en", age_range: profile.ageRange, life_stage: profile.stageSituation,
     content_style: profile.contentStyle, profile: { ...source, ...profile, language: "en" }, userProfile: { ...source, ...profile, language: "en" },
     __personalizationAuthorized: personalized }
