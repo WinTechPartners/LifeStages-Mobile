@@ -7,11 +7,19 @@ fs.mkdirSync(source,{recursive:true})
 fs.copyFileSync('native/android/LifeStagesGoogleBillingPlugin.java',path.join(source,'LifeStagesGoogleBillingPlugin.java'))
 fs.writeFileSync(path.join(source,'MainActivity.java'),`package com.bibleforlifestages;
 import android.os.Bundle;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
  @Override public void onCreate(Bundle savedInstanceState) {
   registerPlugin(LifeStagesGoogleBillingPlugin.class);
   super.onCreate(savedInstanceState);
+  ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (view, insets) -> {
+   Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+   view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+   return insets;
+  });
  }
 }`)
 let variables=fs.readFileSync(path.join(android,'variables.gradle'),'utf8').replace(/compileSdkVersion\s*=\s*\d+/,'compileSdkVersion = 36').replace(/targetSdkVersion\s*=\s*\d+/,'targetSdkVersion = 36').replace(/minSdkVersion\s*=\s*\d+/,'minSdkVersion = 24')
