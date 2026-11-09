@@ -1,0 +1,116 @@
+name: LifeStages iPhone simulator
+on:
+  push:
+    branches: [codex/lifestages-appetize-simulator]
+    paths-ignore: ['docs/**', 'README.md']
+  workflow_dispatch:
+    inputs:
+      signed_release:
+        description: Build a signed real-iPhone release instead of the simulator
+        type: boolean
+        default: false
+      upload:
+        description: Upload the signed release to App Store Connect
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: lifestages-iphone-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  simulator:
+    if: ${{ !inputs.signed_release }}
+    runs-on: macos-26
+    timeout-minutes: 35
+    env:
+      NEXT_PUBLIC_API_BASE_URL: https://www.bibleforlifestages.com
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Install native project tools
+        run: gem install cocoapods xcodeproj --no-document
+      - name: Install locked dependencies
+        run: npm ci --legacy-peer-deps
+      - name: Check TypeScript
+        run: npm run typecheck
+      - name: Build bundled mobile interface
+        run: npm run build:mobile
+      - name: Create and sync the native iOS project
+        run: |
+          npx cap add ios
+          npx cap sync ios
+          ruby scripts/configure-storekit.rb
+      - name: Set simulator privacy descriptions
+        run: |
+          /usr/libexec/PlistBuddy -c 'Add :NSMicrophoneUsageDescription string LifeStages uses your microphone when you choose voice chat.' ios/App/App/Info.plist
+      - name: Compile unsigned simulator app
+        run: |
+          xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios-simulator ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+          test -f build/ios-simulator/Build/Products/Release-iphonesimulator/App.app/Info.plist
+          ditto -c -k --sequesterRsrc --keepParent build/ios-simulator/Build/Products/Release-iphonesimulator/App.app LifeStages-iPhone-Simulator.app.zip
+      - name: Launch the app and capture native startup evidence
+        timeout-minutes: 15
+        run: |
+          mkdir -p build/startup
+          xcrun simctl list devices available --json > build/startup/devices.json
+          device=$(python3 -c 'import json; d=json.load(open("build/startup/devices.json")); print(next(x["udid"] for runtime,items in d["devices"].items() if "iOS" in runtime for x in items if "iPhone" in x["name"]))')
+          xcrun simctl boot "$device" || true
+          xcrun simctl bootstatus "$device" -b
+          xcrun simctl install "$device" build/ios-simulator/Build/Products/Release-iphonesimulator/App.app
+          SIMCTL_CHILD_LIFESTAGES_STARTUP_PROBE=1 xcrun simctl launch --terminate-running-process --stdout="$PWD/build/startup/app.stdout" --stderr="$PWD/build/startup/app.stderr" "$device" com.bibleforlifestages
+          sleep 80
+          xcrun simctl io "$device" screenshot build/startup/home.png
+          xcrun simctl spawn "$device" log show --last 2m --style compact --predicate 'process == "App"' > build/startup/native.log
+          cat build/startup/app.stdout
+          cat build/startup/app.stderr
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          text = Path('build/startup/app.stdout').read_text()
+          marker = 'LIFESTAGES_STARTUP_PROBE: '
+          samples = [json.loads(line.split(marker, 1)[1]) for line in text.splitlines() if marker in line]
+          if not samples: raise RuntimeError('No WebView startup response: inspect screenshot and native logs')
+          state = next((sample for sample in reversed(samples) if 'Read the Bible' in sample.get('text','')), samples[-1])
+          Path('build/startup/webview.json').write_text(json.dumps(state, indent=2))
+          if 'Read the Bible' not in state['text']: raise RuntimeError('Home screen did not render: inspect captured WebView errors')
+          if not state.get('storeKitAvailable'): raise RuntimeError('Native StoreKit bridge was not registered')
+          print('Native WebView rendered the LifeStages home screen.')
+          PY
+      - name: Save startup screenshot and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LifeStages-native-startup
+          path: build/startup/**
+
+      - name: Upload Appetize-ready simulator build
+        uses: actions/upload-artifact@v4
+        with:
+          name: LifeStages-iPhone-Simulator
+          path: LifeStages-iPhone-Simulator.app.zip
+          retention-days: 14
+      - name: Upload the bundled native project for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LifeStages-iOS-Project
+          path: |
+            ios/App/App/**
+            ios/App/App.xcodeproj/**
+            ios/App/Podfile
+            ios/App/Podfile.lock
+          retention-days: 14
+  signed-release:
+    if: ${{ inputs.signed_release }}
+    uses: ./.github/workflows/iphone-appstore.yml
+    with:
+      upload: ${{ inputs.upload || false }}
+    secrets: inherit

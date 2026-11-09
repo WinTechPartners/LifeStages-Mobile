@@ -9,7 +9,9 @@ import { PRODUCT_IDS } from "@/lib/native-iap"
 function SubscriptionContent() {
   const router = useRouter()
   const {
+    canStartTrial,
     tier,
+    ownerAccess,
     isTrialActive,
     daysLeftInTrial,
     isLoading,
@@ -47,32 +49,37 @@ function SubscriptionContent() {
   const yearlyProduct = products.find((p) => p.id === PRODUCT_IDS.YEARLY)
 
   const monthlyPrice = monthlyProduct?.price || "$4.99"
-  const yearlyPrice = yearlyProduct?.price || "$44.99"
+  const yearlyPrice = yearlyProduct?.price || "$49.99"
   const yearlyMonthly = yearlyProduct
     ? `$${(yearlyProduct.priceAmount / 12).toFixed(2)}`
-    : "$3.75"
+    : "$4.17"
 
   const premiumFeatures = [
-    { name: "7-day FREE trial", icon: "celebration", highlight: true },
+    { name: canStartTrial ? "7-day FREE trial" : "Personalized for your life", icon: "celebration", highlight: true },
     { name: "Personalized Stories", icon: "auto_stories", highlight: false },
     { name: "Inspiring Poetry & Hymns", icon: "edit_note", highlight: false },
     { name: "Visual Imagery & Symbols", icon: "image", highlight: false },
     { name: "Worship Songs & Music", icon: "music_note", highlight: false },
     { name: "Biblical Context & Backstory", icon: "history_edu", highlight: false },
-    { name: "Life Situations & Guidance", icon: "explore", highlight: false },
-    { name: "Unlimited AI chat", icon: "chat", highlight: false },
-    { name: "AI that truly knows YOU", icon: "psychology", highlight: true },
+    { name: "Personalized Lifelines", icon: "explore", highlight: false },
+    { name: "Text Chat — Premium", icon: "chat", highlight: false },
+    { name: "Personalization across all content", icon: "psychology", highlight: true },
   ]
 
   const freeFeatures = [
-    { name: "Daily verse from YouVersion", included: true },
-    { name: "Basic friendly breakdown", included: true },
+    { name: "Read the entire Bible", included: true },
+    { name: "Verse of the day", included: true },
+    { name: "Friendly Breakdown", included: true },
+    { name: "Verse explanations", included: true },
+    { name: "All Lifelines", included: true },
     { name: "Personalized stories", included: false },
     { name: "Poetry & hymns", included: false },
     { name: "Visual imagery", included: false },
     { name: "Worship songs", included: false },
     { name: "Biblical context", included: false },
-    { name: "Life situations", included: false },
+    { name: "Personalization of Lifelines & all content", included: false },
+    { name: "Text Chat — Premium", included: false },
+    { name: "Voice Chat — Coming Soon, Premium Plus", included: false },
   ]
 
   const handleStartTrial = async () => {
@@ -87,6 +94,8 @@ function SubscriptionContent() {
         setTimeout(() => {
           router.push("/")
         }, 2000)
+      } else {
+        setError("Purchase cancelled. Your plan has not changed.")
       }
     } catch (err: any) {
       setError(
@@ -154,7 +163,7 @@ function SubscriptionContent() {
         {showSuccess && (
           <div className="mb-4 p-4 bg-green-500/20 border border-green-500/30 rounded-xl text-green-300 text-center">
             <span className="material-symbols-outlined text-3xl mb-2">celebration</span>
-            <p className="font-bold">Your 7-day free trial has started!</p>
+            <p className="font-bold">Your Premium personalization is ready!</p>
             <p className="text-sm text-green-200/70 mt-1">Enjoy all premium features.</p>
           </div>
         )}
@@ -162,14 +171,14 @@ function SubscriptionContent() {
         {/* Hero Section */}
         {tier === "free" && (
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-white mb-2">Transform Your Daily Devotion</h1>
-            <p className="text-blue-200/70">AI-powered scripture that speaks to YOUR life stage</p>
+            <h1 className="text-2xl font-bold text-white mb-2">Premium Brings Personalization</h1>
+            <p className="text-blue-200/70">The Bible, daily verse, Friendly Breakdown, verse explanations, and all Lifelines are free. Premium tailors breakdowns, Lifelines, stories, poetry, imagery, and context to YOUR profile.</p>
 
             {/* Free Trial Badge */}
             <div className="flex justify-center mt-4">
               <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-green-500/20 border border-green-500/30 text-green-400 text-sm font-semibold">
                 <span className="material-symbols-outlined !text-lg">check_circle</span>
-                7-Day Free Trial on All Plans
+                {canStartTrial ? "7-Day Trial of Premium Personalization" : "Premium Personalization"}
               </span>
             </div>
           </div>
@@ -177,7 +186,7 @@ function SubscriptionContent() {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg text-red-300 text-sm">
+          <div role="alert" className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg text-red-300 text-sm">
             {error}
           </div>
         )}
@@ -207,7 +216,7 @@ function SubscriptionContent() {
               >
                 Annual
                 <span className="absolute -top-2 -right-1 px-2 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded-full">
-                  SAVE 25%
+                  SAVE 16%
                 </span>
               </button>
             </div>
@@ -241,7 +250,7 @@ function SubscriptionContent() {
                         <span className="text-sm text-gray-500">/year</span>
                       </div>
                       <p className="text-xs text-green-600 font-medium mt-1">
-                        Just {yearlyMonthly}/month — 3 months FREE!
+                        Just {yearlyMonthly}/month — Save with annual billing
                       </p>
                     </div>
                   )}
@@ -281,19 +290,23 @@ function SubscriptionContent() {
               </div>
             </Card>
 
+            {!canStartTrial && !(selectedPlan === "annual" ? yearlyProduct : monthlyProduct) && (
+              <p role="status" className="text-sm text-amber-200">Apple has not loaded this plan yet. Tap Subscribe with Apple to retry.</p>
+            )}
+
             {/* CTA Button */}
             <button
               onClick={handleStartTrial}
               disabled={purchasing}
               className="w-full py-4 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 text-gray-900 rounded-xl font-bold text-lg shadow-xl active:scale-[0.98] transition-transform disabled:opacity-60"
             >
-              {purchasing ? "Processing..." : "Start FREE 7-Day Trial"}
+              {purchasing ? "Processing..." : canStartTrial ? "Start FREE 7-Day Trial" : "Subscribe with Apple"}
             </button>
 
             <div className="flex items-center justify-center gap-4 text-xs">
               <span className="flex items-center gap-1 text-blue-200/60">
                 <span className="material-symbols-outlined text-sm">check_circle</span>
-                Payment through {typeof window !== "undefined" && /android/i.test(navigator.userAgent) ? "Google Play" : "App Store"}
+                Secure payment
               </span>
             </div>
 
@@ -304,7 +317,7 @@ function SubscriptionContent() {
               </span>
               <span className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">check_circle</span>
-                No charge for 7 days
+                {canStartTrial ? "No charge for 7 days" : "Apple confirms the price before purchase"}
               </span>
             </div>
 
@@ -358,7 +371,7 @@ function SubscriptionContent() {
               </span>
               <span className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">verified</span>
-                Verified by {typeof window !== "undefined" && /android/i.test(navigator.userAgent) ? "Google" : "Apple"}
+                {canStartTrial ? "Secure checkout" : "Verified by Apple"}
               </span>
             </div>
           </div>
@@ -372,7 +385,7 @@ function SubscriptionContent() {
                 check_circle
               </span>
             </div>
-            <p className="text-white font-semibold">You&apos;re enjoying Premium!</p>
+            <p className="text-white font-semibold">{ownerAccess ? "Full owner access" : "You're enjoying Premium!"}</p>
             <p className="text-blue-200/70 text-sm">
               Thank you for using Bible for Life Stages
             </p>

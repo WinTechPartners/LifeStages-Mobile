@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       Line four
       ===POEM
       IMAGE===Ethereal artistic visual description for this poem===IMAGE`,
-      maxTokens: 1000,
+      maxOutputTokens: 1000,
     })
 
     const poem2Promise = generateText({
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       Line four
       ===POEM
       IMAGE===Ethereal artistic visual description for this poem===IMAGE`,
-      maxTokens: 1000,
+      maxOutputTokens: 1000,
     })
 
     const [result1, result2] = await Promise.all([poem1Promise, poem2Promise])

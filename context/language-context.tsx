@@ -1,26 +1,28 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 
-export type LanguageCode = "en" | "es" | "fr" | "de" | "zh" | "vi" | "ko" | "th" | "pt"
+export type LanguageCode = "en" | "es" | "fr" | "de" | "it" | "ja" | "ko" | "pt" | "vi" | "zh" | "th"
 
 export interface Language {
   code: LanguageCode
   name: string
   nativeName: string
   flag: string
+  displayCode: string
 }
 
+// Alphabetical by English name. English stays first as the default.
 export const SUPPORTED_LANGUAGES: Language[] = [
-  { code: "en", name: "English", nativeName: "English", flag: "🇺🇸" },
-  { code: "es", name: "Spanish", nativeName: "Español", flag: "🇪🇸" },
-  { code: "fr", name: "French", nativeName: "Français", flag: "🇫🇷" },
-  { code: "de", name: "German", nativeName: "Deutsch", flag: "🇩🇪" },
-  { code: "pt", name: "Portuguese", nativeName: "Português", flag: "🇧🇷" },
-  { code: "zh", name: "Chinese", nativeName: "中文", flag: "🇨🇳" },
-  { code: "vi", name: "Vietnamese", nativeName: "Tiếng Việt", flag: "🇻🇳" },
-  { code: "ko", name: "Korean", nativeName: "한국어", flag: "🇰🇷" },
-  { code: "th", name: "Thai", nativeName: "ไทย", flag: "🇹🇭" },
+  { code: "en", name: "English",    nativeName: "English",    flag: "🇺🇸", displayCode: "EN" },
+  { code: "fr", name: "French",     nativeName: "Français",   flag: "🇫🇷", displayCode: "FR" },
+  { code: "de", name: "German",     nativeName: "Deutsch",    flag: "🇩🇪", displayCode: "DE" },
+  { code: "it", name: "Italian",    nativeName: "Italiano",   flag: "🇮🇹", displayCode: "IT" },
+  { code: "ja", name: "Japanese",   nativeName: "日本語",      flag: "🇯🇵", displayCode: "JA" },
+  { code: "ko", name: "Korean",     nativeName: "한국어",      flag: "🇰🇷", displayCode: "KO" },
+  { code: "pt", name: "Portuguese", nativeName: "Português",  flag: "🇧🇷", displayCode: "PT-BR" },
+  { code: "es", name: "Spanish",    nativeName: "Español",    flag: "🇲🇽", displayCode: "ES-MX" },
+  { code: "vi", name: "Vietnamese", nativeName: "Tiếng Việt", flag: "🇻🇳", displayCode: "VI" },
 ]
 
 // UI translations
@@ -53,8 +55,7 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     gender: "Gender",
     stageSituation: "What's your stage situation?",
     stageDesc: "Pick what best describes where you are in life right now.",
-    privacyNote:
-      "Your journey is private. We only use this data to personalize your devotional content and it is never shared with third parties.",
+    privacyNote: "Your profile personalizes your content. Permission to connect you with church leadership is a separate choice. See the privacy policy for details.",
     trial: "Trial",
     daysLeft: "days left",
     dayLeft: "day left",
@@ -87,8 +88,7 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     gender: "Género",
     stageSituation: "¿Cuál es tu situación de vida?",
     stageDesc: "Elige lo que mejor describe dónde estás en la vida ahora.",
-    privacyNote:
-      "Tu viaje es privado. Solo usamos estos datos para personalizar tu contenido devocional y nunca se comparte con terceros.",
+    privacyNote: "Tu perfil personaliza tu contenido. El permiso para conectarte con el liderazgo de tu iglesia es una opción separada. Consulta la política de privacidad.",
     trial: "Prueba",
     daysLeft: "días restantes",
     dayLeft: "día restante",
@@ -114,16 +114,14 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     language: "Langue",
     save: "Enregistrer et Continuer",
     letsGetToKnow: "Faisons connaissance",
-    personalizeDesc:
-      "Nous utiliserons ceci pour personnaliser vos dévotions afin qu'elles parlent vraiment à où vous en êtes.",
+    personalizeDesc: "Nous utiliserons ceci pour personnaliser vos dévotions afin qu'elles parlent vraiment à où vous en êtes.",
     fullName: "Nom Complet",
     email: "Adresse Email",
     ageRange: "Tranche d'Âge",
     gender: "Genre",
     stageSituation: "Quelle est votre situation de vie?",
     stageDesc: "Choisissez ce qui décrit le mieux où vous en êtes dans la vie.",
-    privacyNote:
-      "Votre parcours est privé. Nous n'utilisons ces données que pour personnaliser votre contenu et ne les partageons jamais avec des tiers.",
+    privacyNote: "Votre profil personnalise votre contenu. L'autorisation de vous mettre en relation avec les responsables de votre église est un choix distinct. Consultez la politique de confidentialité.",
     trial: "Essai",
     daysLeft: "jours restants",
     dayLeft: "jour restant",
@@ -156,112 +154,76 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     gender: "Geschlecht",
     stageSituation: "Was ist deine Lebenssituation?",
     stageDesc: "Wähle, was am besten beschreibt, wo du gerade im Leben stehst.",
-    privacyNote:
-      "Deine Reise ist privat. Wir nutzen diese Daten nur zur Personalisierung und teilen sie niemals mit Dritten.",
+    privacyNote: "Ihr Profil personalisiert Ihre Inhalte. Die Erlaubnis, Sie mit Ihrer Kirchenleitung zu verbinden, ist eine separate Wahl. Details finden Sie in der Datenschutzerklärung.",
     trial: "Testversion",
     daysLeft: "Tage übrig",
     dayLeft: "Tag übrig",
   },
-  pt: {
-    welcome: "Bem-vindo",
-    discoverInspiration: "Descubra inspiração diária feita especialmente para você.",
-    setUpProfile: "Configure seu perfil",
-    selectVerse: "Selecione um Versículo ou História",
-    verseOfDay: "Versículo do Dia",
-    personalized: "Conteúdo personalizado para sua fase de vida.",
-    friendlyBreakdown: "Explicação Amigável",
-    context: "Contexto",
-    stories: "Histórias",
+  it: {
+    welcome: "Benvenuto",
+    discoverInspiration: "Scopri l'ispirazione quotidiana pensata apposta per te.",
+    setUpProfile: "Configura il tuo profilo",
+    selectVerse: "Seleziona un Versetto o una Storia",
+    verseOfDay: "Versetto del Giorno",
+    personalized: "Contenuto personalizzato per la tua fase di vita.",
+    friendlyBreakdown: "Spiegazione Amichevole",
+    context: "Contesto",
+    stories: "Storie",
     poetry: "Poesia",
-    imagery: "Imagens",
-    songs: "Músicas",
-    loading: "Carregando...",
-    generating: "Preparando sua experiência",
-    profile: "Perfil",
-    home: "Início",
+    imagery: "Immagini",
+    songs: "Canzoni",
+    loading: "Caricamento...",
+    generating: "Preparando la tua esperienza",
+    profile: "Profilo",
+    home: "Home",
     premium: "Premium",
-    language: "Idioma",
-    save: "Salvar e Continuar",
-    letsGetToKnow: "Vamos nos conhecer",
-    personalizeDesc: "Usaremos isso para personalizar seus devocionais para que falem diretamente com você.",
+    language: "Lingua",
+    save: "Salva e Continua",
+    letsGetToKnow: "Facciamo la tua conoscenza",
+    personalizeDesc: "Useremo queste informazioni per personalizzare i tuoi devozionali in modo che parlino davvero a dove sei ora.",
     fullName: "Nome Completo",
-    email: "Endereço de Email",
-    ageRange: "Faixa Etária",
-    gender: "Gênero",
-    stageSituation: "Qual é sua situação de vida?",
-    stageDesc: "Escolha o que melhor descreve onde você está na vida agora.",
-    privacyNote:
-      "Sua jornada é privada. Usamos esses dados apenas para personalizar seu conteúdo e nunca compartilhamos com terceiros.",
-    trial: "Teste",
-    daysLeft: "dias restantes",
-    dayLeft: "dia restante",
+    email: "Indirizzo Email",
+    ageRange: "Fascia d'Età",
+    gender: "Genere",
+    stageSituation: "Qual è la tua situazione di vita?",
+    stageDesc: "Scegli ciò che descrive meglio dove ti trovi nella vita adesso.",
+    privacyNote: "Il tuo profilo personalizza i tuoi contenuti. Il permesso di connetterti con la leadership della chiesa è una scelta separata. Consulta l'informativa sulla privacy per i dettagli.",
+    trial: "Prova",
+    daysLeft: "giorni rimanenti",
+    dayLeft: "giorno rimanente",
   },
-  zh: {
-    welcome: "欢迎",
-    discoverInspiration: "发现专为您量身定制的每日灵感。",
-    setUpProfile: "设置您的个人资料",
-    selectVerse: "选择经文或故事",
-    verseOfDay: "每日经文",
-    personalized: "根据您的人生阶段个性化内容。",
-    friendlyBreakdown: "友好解读",
+  ja: {
+    welcome: "ようこそ",
+    discoverInspiration: "あなただけのために厳選された毎日のインスピレーションを発見しましょう。",
+    setUpProfile: "プロフィールを設定する",
+    selectVerse: "聖句またはストーリーを選択",
+    verseOfDay: "今日の聖句",
+    personalized: "あなたの人生の段階に合わせたコンテンツ。",
+    friendlyBreakdown: "わかりやすい解説",
     context: "背景",
-    stories: "故事",
-    poetry: "诗歌",
-    imagery: "意象",
-    songs: "歌曲",
-    loading: "加载中...",
-    generating: "正在准备您的体验",
-    profile: "个人资料",
-    home: "首页",
-    premium: "高级版",
-    language: "语言",
-    save: "保存并继续",
-    letsGetToKnow: "让我们了解您",
-    personalizeDesc: "我们将用这些信息来个性化您的灵修内容，使其真正与您当前的处境相关。",
-    fullName: "全名",
-    email: "电子邮件地址",
-    ageRange: "年龄范围",
-    gender: "性别",
-    stageSituation: "您目前的生活状况是什么？",
-    stageDesc: "选择最能描述您当前生活状态的选项。",
-    privacyNote: "您的旅程是私密的。我们仅使用这些数据来个性化您的灵修内容，绝不与第三方分享。",
-    trial: "试用",
-    daysLeft: "天剩余",
-    dayLeft: "天剩余",
-  },
-  vi: {
-    welcome: "Chào mừng",
-    discoverInspiration: "Khám phá cảm hứng hàng ngày dành riêng cho bạn.",
-    setUpProfile: "Thiết lập hồ sơ của bạn",
-    selectVerse: "Chọn một Câu Kinh Thánh hoặc Câu Chuyện",
-    verseOfDay: "Câu Kinh Thánh Hôm Nay",
-    personalized: "Nội dung được cá nhân hóa theo giai đoạn cuộc sống của bạn.",
-    friendlyBreakdown: "Giải Thích Thân Thiện",
-    context: "Bối Cảnh",
-    stories: "Câu Chuyện",
-    poetry: "Thơ",
-    imagery: "Hình Ảnh",
-    songs: "Bài Hát",
-    loading: "Đang tải...",
-    generating: "Đang chuẩn bị trải nghiệm của bạn",
-    profile: "Hồ Sơ",
-    home: "Trang Chủ",
-    premium: "Cao Cấp",
-    language: "Ngôn Ngữ",
-    save: "Lưu & Tiếp Tục",
-    letsGetToKnow: "Hãy để chúng tôi hiểu bạn",
-    personalizeDesc: "Chúng tôi sẽ sử dụng thông tin này để cá nhân hóa các bài suy niệm sao cho phù hợp với bạn.",
-    fullName: "Họ và Tên",
-    email: "Địa Chỉ Email",
-    ageRange: "Độ Tuổi",
-    gender: "Giới Tính",
-    stageSituation: "Tình trạng cuộc sống của bạn là gì?",
-    stageDesc: "Chọn điều mô tả đúng nhất vị trí của bạn trong cuộc sống hiện tại.",
-    privacyNote:
-      "Hành trình của bạn là riêng tư. Chúng tôi chỉ sử dụng dữ liệu này để cá nhân hóa nội dung và không bao giờ chia sẻ với bên thứ ba.",
-    trial: "Dùng thử",
-    daysLeft: "ngày còn lại",
-    dayLeft: "ngày còn lại",
+    stories: "ストーリー",
+    poetry: "詩",
+    imagery: "イメージ",
+    songs: "賛美歌",
+    loading: "読み込み中...",
+    generating: "あなたの体験を準備しています",
+    profile: "プロフィール",
+    home: "ホーム",
+    premium: "プレミアム",
+    language: "言語",
+    save: "保存して続ける",
+    letsGetToKnow: "あなたのことを教えてください",
+    personalizeDesc: "この情報を使って、今のあなたに本当に語りかけるデボーションを個別化します。",
+    fullName: "氏名",
+    email: "メールアドレス",
+    ageRange: "年齢層",
+    gender: "性別",
+    stageSituation: "現在の生活状況は？",
+    stageDesc: "今の人生における自分の状況を最もよく表すものを選んでください。",
+    privacyNote: "プロフィールはコンテンツのカスタマイズに使用されます。教会のリーダーシップとの接続を許可することは別の選択です。詳細はプライバシーポリシーをご覧ください。",
+    trial: "試用版",
+    daysLeft: "日残り",
+    dayLeft: "日残り",
   },
   ko: {
     welcome: "환영합니다",
@@ -291,10 +253,109 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     gender: "성별",
     stageSituation: "현재 당신의 인생 상황은?",
     stageDesc: "현재 인생에서 당신의 위치를 가장 잘 설명하는 것을 선택하세요.",
-    privacyNote: "당신의 여정은 비공개입니다. 이 데이터는 콘텐츠 개인화에만 사용되며 제3자와 공유되지 않습니다.",
+    privacyNote: "프로필은 콘텐츠를 맞춤화합니다. 교회 지도자와 연결하도록 허용하는 것은 별도의 선택입니다. 자세한 내용은 개인정보 처리방침을 확인하세요.",
     trial: "체험판",
     daysLeft: "일 남음",
     dayLeft: "일 남음",
+  },
+  pt: {
+    welcome: "Bem-vindo",
+    discoverInspiration: "Descubra inspiração diária feita especialmente para você.",
+    setUpProfile: "Configure seu perfil",
+    selectVerse: "Selecione um Versículo ou História",
+    verseOfDay: "Versículo do Dia",
+    personalized: "Conteúdo personalizado para sua fase de vida.",
+    friendlyBreakdown: "Explicação Amigável",
+    context: "Contexto",
+    stories: "Histórias",
+    poetry: "Poesia",
+    imagery: "Imagens",
+    songs: "Músicas",
+    loading: "Carregando...",
+    generating: "Preparando sua experiência",
+    profile: "Perfil",
+    home: "Início",
+    premium: "Premium",
+    language: "Idioma",
+    save: "Salvar e Continuar",
+    letsGetToKnow: "Vamos nos conhecer",
+    personalizeDesc: "Usaremos isso para personalizar seus devocionais para que falem diretamente com você.",
+    fullName: "Nome Completo",
+    email: "Endereço de Email",
+    ageRange: "Faixa Etária",
+    gender: "Gênero",
+    stageSituation: "Qual é sua situação de vida?",
+    stageDesc: "Escolha o que melhor descreve onde você está na vida agora.",
+    privacyNote: "Seu perfil personaliza seu conteúdo. A permissão para conectar você à liderança da igreja é uma escolha separada. Consulte a política de privacidade.",
+    trial: "Teste",
+    daysLeft: "dias restantes",
+    dayLeft: "dia restante",
+  },
+  vi: {
+    welcome: "Chào mừng",
+    discoverInspiration: "Khám phá cảm hứng hàng ngày dành riêng cho bạn.",
+    setUpProfile: "Thiết lập hồ sơ của bạn",
+    selectVerse: "Chọn một Câu Kinh Thánh hoặc Câu Chuyện",
+    verseOfDay: "Câu Kinh Thánh Hôm Nay",
+    personalized: "Nội dung được cá nhân hóa theo giai đoạn cuộc sống của bạn.",
+    friendlyBreakdown: "Giải Thích Thân Thiện",
+    context: "Bối Cảnh",
+    stories: "Câu Chuyện",
+    poetry: "Thơ",
+    imagery: "Hình Ảnh",
+    songs: "Bài Hát",
+    loading: "Đang tải...",
+    generating: "Đang chuẩn bị trải nghiệm của bạn",
+    profile: "Hồ Sơ",
+    home: "Trang Chủ",
+    premium: "Cao Cấp",
+    language: "Ngôn Ngữ",
+    save: "Lưu & Tiếp Tục",
+    letsGetToKnow: "Hãy để chúng tôi hiểu bạn",
+    personalizeDesc: "Chúng tôi sẽ sử dụng thông tin này để cá nhân hóa các bài suy niệm sao cho phù hợp với bạn.",
+    fullName: "Họ và Tên",
+    email: "Địa Chỉ Email",
+    ageRange: "Độ Tuổi",
+    gender: "Giới Tính",
+    stageSituation: "Tình trạng cuộc sống của bạn là gì?",
+    stageDesc: "Chọn điều mô tả đúng nhất vị trí của bạn trong cuộc sống hiện tại.",
+    privacyNote: "Hồ sơ giúp cá nhân hóa nội dung của bạn. Cho phép kết nối bạn với ban lãnh đạo hội thánh là lựa chọn riêng. Xem chính sách quyền riêng tư để biết thêm.",
+    trial: "Dùng thử",
+    daysLeft: "ngày còn lại",
+    dayLeft: "ngày còn lại",
+  },
+  zh: {
+    welcome: "欢迎",
+    discoverInspiration: "发现专为您量身定制的每日灵感。",
+    setUpProfile: "设置您的个人资料",
+    selectVerse: "选择经文或故事",
+    verseOfDay: "每日经文",
+    personalized: "根据您的人生阶段个性化内容。",
+    friendlyBreakdown: "友好解读",
+    context: "背景",
+    stories: "故事",
+    poetry: "诗歌",
+    imagery: "意象",
+    songs: "歌曲",
+    loading: "加载中...",
+    generating: "正在准备您的体验",
+    profile: "个人资料",
+    home: "首页",
+    premium: "高级版",
+    language: "语言",
+    save: "保存并继续",
+    letsGetToKnow: "让我们了解您",
+    personalizeDesc: "我们将用这些信息来个性化您的灵修内容，使其真正与您当前的处境相关。",
+    fullName: "全名",
+    email: "电子邮件地址",
+    ageRange: "年龄范围",
+    gender: "性别",
+    stageSituation: "您目前的生活状况是什么？",
+    stageDesc: "选择最能描述您当前生活状态的选项。",
+    privacyNote: "您的个人资料用于个性化内容。允许我们将您与教会领导联系起来是单独的选择。详情请参阅隐私政策。",
+    trial: "试用",
+    daysLeft: "天剩余",
+    dayLeft: "天剩余",
   },
   th: {
     welcome: "ยินดีต้อนรับ",
@@ -324,7 +385,7 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     gender: "เพศ",
     stageSituation: "สถานการณ์ชีวิตของคุณเป็นอย่างไร?",
     stageDesc: "เลือกสิ่งที่อธิบายตำแหน่งของคุณในชีวิตได้ดีที่สุด",
-    privacyNote: "การเดินทางของคุณเป็นส่วนตัว เราใช้ข้อมูลนี้เพื่อปรับแต่งเนื้อหาเท่านั้นและไม่เคยแบ่งปันกับบุคคลที่สาม",
+    privacyNote: "โปรไฟล์ของคุณใช้ปรับเนื้อหาให้เหมาะกับคุณ การอนุญาตให้เชื่อมต่อคุณกับผู้นำคริสตจักรเป็นตัวเลือกแยกต่างหาก ดูรายละเอียดในนโยบายความเป็นส่วนตัว",
     trial: "ทดลองใช้",
     daysLeft: "วันที่เหลือ",
     dayLeft: "วันที่เหลือ",
@@ -340,26 +401,41 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
 
+function readSavedLanguage(): LanguageCode {
+  if (typeof window === "undefined") return "en"
+  try {
+    const saved = localStorage.getItem("userLanguage") as LanguageCode | null
+    if (saved && translations[saved]) return saved
+    const profile = JSON.parse(localStorage.getItem("userProfile") || "{}")
+    if (profile.language && translations[profile.language as LanguageCode]) return profile.language as LanguageCode
+  } catch { /* ignore */ }
+  return "en"
+}
+
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<LanguageCode>("en")
 
   useEffect(() => {
-    const saved = localStorage.getItem("userLanguage")
-    if (saved && SUPPORTED_LANGUAGES.some((l) => l.code === saved)) {
-      setLanguageState(saved as LanguageCode)
-    }
+    setLanguageState(readSavedLanguage())
   }, [])
 
   const setLanguage = (lang: LanguageCode) => {
     setLanguageState(lang)
-    localStorage.setItem("userLanguage", lang)
+    try {
+      localStorage.setItem("userLanguage", lang)
+      const saved = localStorage.getItem("userProfile")
+      if (saved) {
+        const profile = JSON.parse(saved)
+        localStorage.setItem("userProfile", JSON.stringify({ ...profile, language: lang }))
+      }
+    } catch { /* ignore */ }
   }
 
   const t = (key: string): string => {
-    return translations[language][key] || translations.en[key] || key
+    return translations[language]?.[key] ?? translations.en[key] ?? key
   }
 
-  const currentLanguage = SUPPORTED_LANGUAGES.find((l) => l.code === language) || SUPPORTED_LANGUAGES[0]
+  const currentLanguage = SUPPORTED_LANGUAGES.find((l) => l.code === language) ?? SUPPORTED_LANGUAGES[0]
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t, currentLanguage }}>

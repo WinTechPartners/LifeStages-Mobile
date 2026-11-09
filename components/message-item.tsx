@@ -1,6 +1,6 @@
 "use client"
 
-import type { Message } from "ai"
+import type { ChatMessage as Message } from "@/types/chat-message"
 import { User, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 import ReactMarkdown from "react-markdown"

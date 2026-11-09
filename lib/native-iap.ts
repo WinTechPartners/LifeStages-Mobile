@@ -1,283 +1,66 @@
-/**
- * Native In-App Purchases Bridge
- *
- * Uses @capgo/capacitor-purchases for StoreKit 2 (iOS)
- * and Google Play Billing (Android).
- *
- * Falls back gracefully when running in web browser (dev mode).
- */
-
-import { isNative, getPlatform } from "./native-features"
-
-// Product IDs — must match App Store Connect / Google Play Console
-export const PRODUCT_IDS = {
-  MONTHLY: "com.lifestagesai.bible.premium.monthly",
-  YEARLY: "com.lifestagesai.bible.premium.yearly",
-} as const
-
-export type SubscriptionStatus =
-  | "active"
-  | "trialing"
-  | "expired"
-  | "canceled"
-  | "none"
-
-export interface IAPProduct {
-  id: string
-  title: string
-  description: string
-  price: string // Localized price string from the store (e.g. "$4.99")
-  priceAmount: number
-  currency: string
-  period: "monthly" | "yearly"
+/** Direct Apple StoreKit 2 bridge. No billing intermediary or embedded signing key. */
+import { registerPlugin, Capacitor, type PluginListenerHandle } from '@capacitor/core'
+import { isNative, getPlatform } from './native-features'
+export const PRODUCT_IDS = { MONTHLY:'001', YEARLY:'com.bibleforlifestages.premium.yearly' } as const
+export type SubscriptionStatus = 'active' | 'trialing' | 'expired' | 'canceled' | 'none'
+export interface IAPProduct { id:string; title:string; description:string; price:string; priceAmount:number; currency:string; period:'monthly'|'yearly' }
+export interface IAPSubscriptionInfo { status:SubscriptionStatus; productId:string|null; expiresAt:number|null; isTrialing:boolean; willRenew:boolean }
+interface AppleSubscription extends IAPSubscriptionInfo { signedTransaction?:string }
+interface StoreKitBridge {
+  getProducts():Promise<{products:IAPProduct[]}>
+  getSubscription():Promise<AppleSubscription>
+  restore():Promise<AppleSubscription>
+  manageSubscriptions():Promise<void>
+  purchase(options:{productId:string}):Promise<{outcome:'purchased'|'pending'|'cancelled';subscription?:AppleSubscription}>
+  addListener(event:'subscriptionChanged', listener:(value:AppleSubscription)=>void):Promise<PluginListenerHandle>
 }
-
-export interface IAPSubscriptionInfo {
-  status: SubscriptionStatus
-  productId: string | null
-  expiresAt: number | null // timestamp
-  isTrialing: boolean
-  willRenew: boolean
+const store = registerPlugin<StoreKitBridge>('LifeStagesStoreKit')
+const empty = ():IAPSubscriptionInfo => ({status:'none',productId:null,expiresAt:null,isTrialing:false,willRenew:false})
+const known = (id:unknown) => id === PRODUCT_IDS.MONTHLY || id === PRODUCT_IDS.YEARLY
+let signedTransaction:string|null = null
+export const getAppleTransaction = () => signedTransaction
+export function normalizeAppleSubscription(value:AppleSubscription, now=Date.now()):IAPSubscriptionInfo {
+  if (!known(value?.productId) || !['active','trialing'].includes(value?.status) || !Number.isFinite(value?.expiresAt) || value.expiresAt! <= now || !value.signedTransaction) return empty()
+  return {status:value.status,productId:value.productId,expiresAt:value.expiresAt,isTrialing:value.status==='trialing',willRenew:value.willRenew===true}
 }
-
-// ============================================
-// Initialize Store
-// ============================================
-
-let storeReady = false
-
-export async function initializeIAP(): Promise<boolean> {
-  if (!isNative()) {
-    console.log("[IAP] Not native — skipping init")
-    return false
-  }
-
-  if (storeReady) return true
-
-  try {
-    const { InAppPurchases } = await import("@capgo/capacitor-purchases")
-
-    const platform = getPlatform()
-    if (platform === "ios") {
-      // Apple App Store — no API key needed for StoreKit 2
-      await InAppPurchases.initialize({})
-    } else if (platform === "android") {
-      // Google Play — uses the app's own billing key from Play Console
-      await InAppPurchases.initialize({})
-    }
-
-    storeReady = true
-    console.log("[IAP] Store initialized")
-    return true
-  } catch (e) {
-    console.error("[IAP] Failed to initialize:", e)
-    return false
-  }
+function accept(value:AppleSubscription):IAPSubscriptionInfo {
+  const result=normalizeAppleSubscription(value)
+  signedTransaction = result.status==='none' ? null : value.signedTransaction!
+  return result
 }
-
-// ============================================
-// Load Products
-// ============================================
-
-export async function getProducts(): Promise<IAPProduct[]> {
-  if (!isNative()) {
-    // Return mock products for web dev
-    return [
-      {
-        id: PRODUCT_IDS.MONTHLY,
-        title: "Premium Monthly",
-        description: "Full access to all features",
-        price: "$4.99",
-        priceAmount: 4.99,
-        currency: "USD",
-        period: "monthly",
-      },
-      {
-        id: PRODUCT_IDS.YEARLY,
-        title: "Premium Yearly",
-        description: "Full access — save 25%",
-        price: "$44.99",
-        priceAmount: 44.99,
-        currency: "USD",
-        period: "yearly",
-      },
-    ]
-  }
-
-  try {
-    const { InAppPurchases } = await import("@capgo/capacitor-purchases")
-    const result = await InAppPurchases.getProducts({
-      productIds: [PRODUCT_IDS.MONTHLY, PRODUCT_IDS.YEARLY],
-    })
-
-    return (result.products || []).map((p: any) => ({
-      id: p.productId || p.id,
-      title: p.title || (p.productId?.includes("yearly") ? "Premium Yearly" : "Premium Monthly"),
-      description: p.description || "Full access to all features",
-      price: p.localizedPrice || p.price || "$4.99",
-      priceAmount: p.priceAmount || parseFloat(String(p.price || "4.99").replace(/[^0-9.]/g, "")),
-      currency: p.currency || "USD",
-      period: (p.productId || p.id || "").includes("yearly") ? "yearly" as const : "monthly" as const,
-    }))
-  } catch (e) {
-    console.error("[IAP] Failed to load products:", e)
-    return []
-  }
+export async function initializeIAP():Promise<boolean> {
+  return isNative() && getPlatform()==='ios' && Capacitor.isPluginAvailable('LifeStagesStoreKit')
 }
-
-// ============================================
-// Purchase
-// ============================================
-
-export async function purchaseProduct(productId: string): Promise<boolean> {
-  if (!isNative()) {
-    console.log("[IAP] Web mode — simulating purchase of:", productId)
-    // In dev, simulate success
-    localStorage.setItem("iap_mock_status", JSON.stringify({
-      status: "trialing",
-      productId,
-      expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
-      isTrialing: true,
-      willRenew: true,
-    }))
-    return true
-  }
-
-  try {
-    const { InAppPurchases } = await import("@capgo/capacitor-purchases")
-    const result = await InAppPurchases.purchaseProduct({ productId })
-
-    if (result.transactionId) {
-      console.log("[IAP] Purchase successful:", result.transactionId)
-
-      // Send receipt to our server for validation
-      await validateReceipt(result.receipt || result.transactionId)
-      return true
-    }
-
-    return false
-  } catch (e: any) {
-    if (e?.code === "USER_CANCELLED" || e?.message?.includes("cancel")) {
-      console.log("[IAP] User cancelled purchase")
-      return false
-    }
-    console.error("[IAP] Purchase failed:", e)
-    throw e
-  }
+export async function getProducts():Promise<IAPProduct[]> {
+  if (!await initializeIAP()) return []
+  try { return (await store.getProducts()).products.filter(p=>known(p.id)) } catch { return [] }
 }
-
-// ============================================
-// Restore Purchases
-// ============================================
-
-export async function restorePurchases(): Promise<IAPSubscriptionInfo> {
-  const noSub: IAPSubscriptionInfo = {
-    status: "none",
-    productId: null,
-    expiresAt: null,
-    isTrialing: false,
-    willRenew: false,
-  }
-
-  if (!isNative()) {
-    // Check mock status for dev
-    const mock = localStorage.getItem("iap_mock_status")
-    if (mock) return JSON.parse(mock)
-    return noSub
-  }
-
-  try {
-    const { InAppPurchases } = await import("@capgo/capacitor-purchases")
-    const result = await InAppPurchases.restorePurchases()
-
-    if (result.activeSubscriptions && result.activeSubscriptions.length > 0) {
-      const sub = result.activeSubscriptions[0]
-      return {
-        status: sub.isTrialPeriod ? "trialing" : "active",
-        productId: sub.productId,
-        expiresAt: sub.expiresDate ? new Date(sub.expiresDate).getTime() : null,
-        isTrialing: !!sub.isTrialPeriod,
-        willRenew: !sub.willAutoRenew === false,
-      }
-    }
-
-    return noSub
-  } catch (e) {
-    console.error("[IAP] Restore failed:", e)
-    return noSub
-  }
+export async function getSubscriptionInfo():Promise<IAPSubscriptionInfo> {
+  if (!await initializeIAP()) { signedTransaction=null; return empty() }
+  try { return accept(await store.getSubscription()) } catch { signedTransaction=null; return empty() }
 }
-
-// ============================================
-// Check Current Subscription
-// ============================================
-
-export async function getSubscriptionInfo(): Promise<IAPSubscriptionInfo> {
-  const noSub: IAPSubscriptionInfo = {
-    status: "none",
-    productId: null,
-    expiresAt: null,
-    isTrialing: false,
-    willRenew: false,
-  }
-
-  if (!isNative()) {
-    const mock = localStorage.getItem("iap_mock_status")
-    if (mock) {
-      const parsed = JSON.parse(mock)
-      // Check if mock trial expired
-      if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
-        localStorage.removeItem("iap_mock_status")
-        return noSub
-      }
-      return parsed
-    }
-    return noSub
-  }
-
-  try {
-    // Try restore to get current status
-    return await restorePurchases()
-  } catch (e) {
-    console.error("[IAP] Failed to get subscription info:", e)
-    return noSub
-  }
+export async function restorePurchases():Promise<IAPSubscriptionInfo> {
+  if (!await initializeIAP()) return empty()
+  return accept(await store.restore())
 }
-
-// ============================================
-// Receipt Validation (server-side)
-// ============================================
-
-async function validateReceipt(receipt: string): Promise<boolean> {
-  try {
-    const { apiUrl } = await import("./api-base")
-    const response = await fetch(apiUrl("/api/iap/validate"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        receipt,
-        platform: getPlatform(),
-        email: getStoredEmail(),
-      }),
-    })
-
-    if (response.ok) {
-      const data = await response.json()
-      return data.valid === true
-    }
-
-    return false
-  } catch (e) {
-    console.error("[IAP] Receipt validation failed:", e)
-    // Don't block the user — Apple's receipt is the source of truth
-    return true
-  }
+export async function purchaseProduct(productId:string):Promise<boolean> {
+  if (!known(productId)) throw Error('This subscription plan is unavailable.')
+  if (!await initializeIAP()) throw Error('Apple billing is unavailable in this app build. Update LifeStages in TestFlight and try again.')
+  // Prevent charging anyone before the hosted personalization verifier is configured.
+  const response=await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || ''}/api/apple/status`,{cache:'no-store',signal:AbortSignal.timeout(15000)})
+  if (!response.ok || !(await response.json()).configured) throw Error('Apple subscriptions are being set up. Please try again later.')
+  const result=await store.purchase({productId})
+  if (result.outcome==='cancelled') return false
+  if (result.outcome==='pending') throw Error('Your Apple purchase is awaiting approval. Your plan will update after Apple confirms it.')
+  if (!result.subscription || accept(result.subscription).status==='none') throw Error('Apple has not confirmed an active subscription. Please use Restore Purchases or try again.')
+  return true
 }
-
-function getStoredEmail(): string | null {
-  try {
-    return localStorage.getItem("bible_user_email")
-  } catch {
-    return null
-  }
+export async function listenForSubscriptionChanges(listener:()=>void):Promise<()=>void> {
+  if (!await initializeIAP()) return ()=>{}
+  const handle=await store.addListener('subscriptionChanged', value=>{accept(value);listener()})
+  return ()=>{void handle.remove()}
+}
+export async function manageAppleSubscriptions():Promise<void> {
+  if (!await initializeIAP()) throw Error('Apple subscription settings are unavailable.')
+  await store.manageSubscriptions()
 }

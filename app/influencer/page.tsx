@@ -1162,7 +1162,7 @@ export default function InfluencerLandingPage() {
                 <blockquote className="my-4 pl-4 border-l-2 border-amber-400/50">
                   <p className="text-white text-sm italic leading-relaxed">
                     &ldquo;How can Scripture help me right now? If I open the Bible, I&apos;m reading the same 
-                    generic verse my 26-year-old son is reading, the same verse my 21-year-old daughter is reading. 
+                    verse my 26-year-old son is reading, the same verse my 21-year-old daughter is reading.
                     We&apos;re in totally different places. Scripture doesn&apos;t know what&apos;s happening in my life.&rdquo;
                   </p>
                 </blockquote>

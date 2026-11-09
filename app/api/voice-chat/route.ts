@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       model: openrouter(modelId),
       system: systemPrompt,
       prompt,
-      maxTokens: 150,
+      maxOutputTokens: 150,
     })
     
     // Strip any URLs that might have snuck through

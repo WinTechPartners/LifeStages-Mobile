@@ -87,7 +87,7 @@ export default function BibleComCompanionPage() {
     { feature: "Multiple Translations", biblecom: "✓ Extensive", us: "✓ Key translations", usHighlight: false },
     { feature: "Reading Plans", biblecom: "✓ Thousands", us: "— Focus on daily verse", usHighlight: false },
     { feature: "Community Features", biblecom: "✓ Robust", us: "— Individual focus", usHighlight: false },
-    { feature: "Life-Stage Personalization", biblecom: "— Generic plans", us: "✓ AI-powered", usHighlight: true },
+    { feature: "Life-Stage Personalization", biblecom: "— plans", us: "✓ AI-powered", usHighlight: true },
     { feature: "Age-Appropriate Context", biblecom: "— Same for all", us: "✓ Dynamic", usHighlight: true },
     { feature: "Situation-Aware Reflection", biblecom: "— Manual selection", us: "✓ Automatic", usHighlight: true },
   ]

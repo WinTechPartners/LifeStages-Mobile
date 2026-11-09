@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useChurch } from "@/context/church-context"
+import { useLanguage } from "@/context/language-context"
 
 interface HeaderDropdownProps {
   verseReference?: string
@@ -11,6 +13,9 @@ export function HeaderDropdown({ verseReference }: HeaderDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const { church } = useChurch()
+  const { language } = useLanguage()
+  const vi = language === "vi"
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -63,15 +68,22 @@ export function HeaderDropdown({ verseReference }: HeaderDropdownProps) {
   return (
     <div className="relative" ref={dropdownRef}>
       <button
+        aria-label={vi ? "Mở menu" : "Open menu"}
+        aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
-        className="flex size-10 items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+        className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-white/10 transition-colors"
       >
-        <span className="material-symbols-outlined text-white">more_vert</span>
+        <span className="material-symbols-outlined">more_vert</span>
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-12 z-50 w-56 rounded-xl bg-card border border-border shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute right-0 top-12 z-50 w-64 rounded-xl bg-card text-card-foreground border border-border shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
           <div className="py-2">
+            {church && <p className="px-4 pt-2 pb-1 text-xs text-muted-foreground break-words">{church.name}</p>}
+            <button onClick={() => { router.push(church ? "/my-church" : "/connect"); setIsOpen(false) }} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted transition-colors">
+              <span className="material-symbols-outlined text-primary">church</span>
+              <span className="font-medium">{church ? (vi ? "Hội thánh & liên hệ lãnh đạo" : "My church & leadership") : (vi ? "Kết nối hội thánh" : "Connect my church")}</span>
+            </button>
             <button
               onClick={handleProfile}
               className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted transition-colors"

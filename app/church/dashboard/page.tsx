@@ -1139,44 +1139,6 @@ const PastoralGuidanceCard = ({ item, index }: { item: any; index: number }) => 
   );
 };
 
-  return (
-    <div className={`bg-white/5 rounded-2xl border border-white/10 overflow-hidden transition-all hover:border-amber-400/50 cursor-pointer ${expanded ? 'ring-2 ring-amber-400' : ''}`} onClick={() => setExpanded(!expanded)}>
-      <div className="p-5">
-        <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style={{ backgroundColor: rec.color }}>{index + 1}</div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${priorityColors[rec.priority]}`}>{rec.priority}</span>
-              <span className="flex items-center gap-1 text-xs text-blue-200/50 bg-white/5 px-2 py-1 rounded-full">
-                {getIcon(rec.icon)}
-                <span className="ml-1">{rec.type}</span>
-              </span>
-            </div>
-            <h3 className="font-bold text-white mb-2">{rec.title}</h3>
-            <p className="text-blue-200/70 text-sm">{rec.description}</p>
-          </div>
-        </div>
-        {expanded && (
-          <div className="mt-5 pt-5 border-t border-white/10 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/5 rounded-xl p-3"><p className="text-xs text-blue-200/50 mb-1">Target</p><p className="font-semibold text-white text-sm">{rec.audience}</p></div>
-              <div className="bg-white/5 rounded-xl p-3"><p className="text-xs text-blue-200/50 mb-1">Impact</p><p className="font-semibold text-emerald-400 text-sm">{rec.impact}</p></div>
-            </div>
-            <div className="bg-white/5 rounded-xl p-3"><p className="text-xs text-blue-200/50 mb-1">Best Timing</p><p className="font-semibold text-white text-sm">{rec.timing}</p></div>
-            <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-xl p-4 border border-amber-400/30">
-              <p className="text-xs text-amber-300/70 mb-2 flex items-center gap-1"><Icons.Sparkles /> AI Content Brief</p>
-              <p className="text-sm text-white/90">{rec.contentBrief}</p>
-            </div>
-            <button className="w-full py-3 bg-gradient-to-r from-amber-400 to-orange-500 text-gray-900 rounded-xl font-bold hover:shadow-lg transition-all flex items-center justify-center gap-2">
-              <Icons.Play /> Generate This Content
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
 // ============ MAIN COMPONENT ============
 
 export default function ChurchDashboard() {

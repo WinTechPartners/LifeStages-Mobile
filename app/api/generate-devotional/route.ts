@@ -77,7 +77,7 @@ export async function POST(request: Request) {
       model: openrouter(modelId),
       system: systemInstruction,
       prompt: fullPrompt,
-      maxTokens: 4000,
+      maxOutputTokens: 4000,
     })
 
     // Parse and return the JSON

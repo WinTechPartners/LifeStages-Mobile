@@ -30,7 +30,7 @@ export function UpgradePrompt({ feature }: UpgradePromptProps) {
             >
               Start 7-Day Free Trial
             </Button>
-            <div className="text-xs text-gray-500">Then $5/month or $45/year</div>
+            <div className="text-xs text-gray-500">Then $4.99/month or $49.99/year</div>
           </div>
         )}
 
@@ -39,7 +39,7 @@ export function UpgradePrompt({ feature }: UpgradePromptProps) {
             <Button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700">
               Upgrade Now
             </Button>
-            <div className="text-xs text-gray-500">$5/month or $45/year</div>
+            <div className="text-xs text-gray-500">$4.99/month or $49.99/year</div>
           </div>
         )}
       </div>

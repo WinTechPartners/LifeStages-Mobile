@@ -1,19 +1,7 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Libre_Baskerville, Inter } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
-import { DevotionalProvider } from "@/context/devotional-context"
-import { SubscriptionProvider } from "@/context/subscription-context"
-import { LanguageProvider } from "@/context/language-context"
-import { ChurchProvider } from "@/context/church-context"
-import EmailGate from "@/components/email-gate"
+import AppProviders from "@/components/app-providers"
 import "./globals.css"
-
-const _libreBaskerville = Libre_Baskerville({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-})
-const _inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "LifeStages | Bible for Life Stages",
@@ -52,20 +40,11 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0..1,0"
+          href="/fonts/material-symbols.css"
         />
       </head>
       <body className="font-sans antialiased overscroll-none select-none">
-        <LanguageProvider>
-          <SubscriptionProvider>
-            <ChurchProvider>
-              <DevotionalProvider>
-                <EmailGate>{children}</EmailGate>
-              </DevotionalProvider>
-            </ChurchProvider>
-          </SubscriptionProvider>
-        </LanguageProvider>
-        <Analytics />
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   )

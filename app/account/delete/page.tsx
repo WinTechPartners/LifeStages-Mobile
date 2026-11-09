@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSubscription } from "@/context/subscription-context"
+import { apiFetch } from "@/lib/api-base"
+import { eraseAllAnalytics } from "@/lib/analytics/client"
 
 export default function DeleteAccountPage() {
   const router = useRouter()
@@ -20,7 +22,9 @@ export default function DeleteAccountPage() {
     setError(null)
 
     try {
-      const res = await fetch("/api/account/delete", {
+      // Keep the local deletion identifiers until the server confirms erasure.
+      await eraseAllAnalytics()
+      const res = await apiFetch("/api/account/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: userEmail }),

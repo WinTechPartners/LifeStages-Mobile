@@ -1,0 +1,84 @@
+workflows:
+  ios-app-store:
+    name: iOS App Store
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      node: 20.11.0
+      xcode: latest
+      cocoapods: default
+      vars:
+        NEXT_PUBLIC_API_BASE_URL: https://bibleforlifestages.com
+        BUILD_TARGET: mobile
+        NEXT_TELEMETRY_DISABLED: "1"
+      app_store_connect:
+        auth: integration        # Uses the App Store Connect API key you configure in Codemagic UI
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.bibleforlifestages
+
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+
+      - name: Build mobile static export
+        script: node scripts/build-mobile.mjs
+
+      - name: Capacitor sync iOS
+        script: npx cap sync ios
+
+      - name: Set version and build number
+        script: |
+          VERSION=$(node -p "require('./package.json').version")
+          xcrun agvtool new-marketing-version "$VERSION"
+          xcrun agvtool new-version -all "$BUILD_NUMBER"
+        working_directory: ios/App
+
+      - name: Install CocoaPods
+        script: pod install
+        working_directory: ios/App
+
+      - name: Build and archive
+        script: |
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -archivePath "$CM_BUILD_DIR/App.xcarchive" \
+            archive \
+            CODE_SIGN_STYLE=Automatic
+        working_directory: ios/App
+
+      - name: Export IPA
+        script: |
+          cat > /tmp/ExportOptions.plist << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$CM_BUILD_DIR/App.xcarchive" \
+            -exportPath "$CM_BUILD_DIR/ipa" \
+            -exportOptionsPlist /tmp/ExportOptions.plist
+
+    artifacts:
+      - ios/App/App.xcarchive
+      - $CM_BUILD_DIR/ipa/*.ipa
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false   # Flip to true once you have verified the build

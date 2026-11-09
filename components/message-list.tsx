@@ -1,6 +1,6 @@
 "use client"
 
-import type { Message } from "ai"
+import type { ChatMessage as Message } from "@/types/chat-message"
 import { MessageItem } from "./message-item"
 import { LoadingIndicator } from "./loading-indicator"
 

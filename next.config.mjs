@@ -1,7 +1,10 @@
 /** @type {import('next').NextConfig} */
+import { fileURLToPath } from 'node:url'
 const isMobile = process.env.BUILD_TARGET === 'mobile'
 
 const nextConfig = {
+  outputFileTracingIncludes: { '/api/**': ['./certificates/apple/*.cer'] },
+  outputFileTracingRoot: fileURLToPath(new URL('.', import.meta.url)),
   // Static export for Capacitor mobile builds
   // Web builds continue to use server-side rendering
   ...(isMobile && {
@@ -20,6 +23,11 @@ const nextConfig = {
   ...(!isMobile && {
     async headers() {
       return [
+        {source:'/api/:path*',headers:[
+          {key:'Access-Control-Allow-Origin',value:'capacitor://localhost'},
+          {key:'Access-Control-Allow-Methods',value:'GET, POST, OPTIONS'},
+          {key:'Access-Control-Allow-Headers',value:'Content-Type, Authorization'}
+        ]},
         {
           source: '/:path*',
           headers: [

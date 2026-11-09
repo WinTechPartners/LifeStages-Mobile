@@ -127,3 +127,18 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Church identity changes selected app surfaces; status and content-category colors stay semantic. */
+.church-brand-surface {
+  background-color: var(--church-secondary, #0c1929);
+  color: var(--church-on-secondary, #ffffff);
+  border-top: 3px solid var(--church-primary, #f59e0b);
+}
+.church-brand-button,
+.church-branded .bg-primary {
+  background-color: var(--church-primary, #f59e0b);
+  color: var(--church-on-primary, #000000);
+}
+.church-brand-button:hover { filter: brightness(1.08); }
+.church-brand-button:focus-visible { outline: 2px solid var(--church-accent, #f59e0b); outline-offset: 3px; }
+.church-branded .text-primary { color: var(--church-accent, #f59e0b); }

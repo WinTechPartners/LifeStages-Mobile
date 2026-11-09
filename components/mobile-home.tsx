@@ -1,4 +1,6 @@
 "use client"
+import Link from "next/link"
+import { AppImage } from "@/components/app-image"
 
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -19,8 +21,8 @@ export default function MobileHome() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { devotional, userName, isLoading, loadingStates, generateDevotional } = useDevotional()
-  const { canAccessPremium } = useSubscription()
-  const { t } = useLanguage()
+  const { canAccessPremium, canStartTrial } = useSubscription()
+  const { t, language } = useLanguage()
   const { hasChurch, church, lastSermon, thisSermon, logo, showSermonRow, isLoading: churchLoading } = useChurch()
   const [hasGenerated, setHasGenerated] = useState(false)
   const [showProfileHint, setShowProfileHint] = useState(false)
@@ -87,41 +89,35 @@ export default function MobileHome() {
     }
   }, [pushAsked, router])
 
-  // Auto-set church code from URL param
+  // Invitation links open a preview; joining always requires the user's Connect action.
   useEffect(() => {
     const churchParam = searchParams.get('church')
-    if (churchParam) {
-      const savedProfile = localStorage.getItem("userProfile")
-      const profile = savedProfile ? JSON.parse(savedProfile) : {}
-      if (profile.churchId?.toLowerCase() !== churchParam.toLowerCase()) {
-        profile.churchId = churchParam.toUpperCase()
-        localStorage.setItem("userProfile", JSON.stringify(profile))
-        window.location.href = '/'
-      }
-    }
-  }, [searchParams])
+    if (churchParam) router.replace(`/connect?church=${encodeURIComponent(churchParam)}`)
+  }, [searchParams, router])
 
   // Check if profile exists
   useEffect(() => {
-    const savedProfile = localStorage.getItem("userProfile")
-    if (!savedProfile) {
-      setShowProfileHint(true)
-    } else {
+    const readProfile = () => {
       try {
-        const profile = JSON.parse(savedProfile)
+        const profile = JSON.parse(localStorage.getItem("userProfile") || "null")
         setUserProfile(profile)
-        if (!(profile.ageRange || profile.age) || !profile.gender) setShowProfileHint(true)
-      } catch { setShowProfileHint(true) }
+        setShowProfileHint(!profile || !(profile.ageRange || profile.ageBand || profile.age) || !profile.gender)
+      } catch { setUserProfile(null); setShowProfileHint(true) }
     }
+    const onStorage = (event: StorageEvent) => { if (event.key === "userProfile" || event.key === null) readProfile() }
+    readProfile()
+    window.addEventListener("lifestages-profile-changed", readProfile)
+    window.addEventListener("storage", onStorage)
+    return () => { window.removeEventListener("lifestages-profile-changed", readProfile); window.removeEventListener("storage", onStorage) }
   }, [])
 
   // Auto-generate verse
   useEffect(() => {
-    if (!devotional.verse && !isLoading && !hasGenerated && networkOnline) {
+    if (!churchLoading && !devotional.verse && !isLoading && !hasGenerated && networkOnline) {
       setHasGenerated(true)
       generateDevotional("YouVersion")
     }
-  }, [devotional.verse, isLoading, hasGenerated, generateDevotional, networkOnline])
+  }, [churchLoading, devotional.verse, isLoading, hasGenerated, generateDevotional, networkOnline])
 
   // Cache verse for offline access when new verse loads
   useEffect(() => {
@@ -160,33 +156,38 @@ export default function MobileHome() {
       )}
 
       {/* ========================================================
-          BLOCK 1 & 2: Logo + Title (Generic or Church)
+          BLOCK 1 & 2: Logo + Title (or Church)
           ======================================================== */}
-      <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 bg-[#0c1929]/95 backdrop-blur-xl border-b border-white/5">
-        <div className="flex items-center gap-3">
+      <header className="church-brand-surface relative z-30 flex flex-col items-center px-4 pt-16 pb-5 backdrop-blur-xl border-b border-white/5">
+        <div className="flex min-w-0 flex-col items-center gap-3 text-center">
           {/* BLOCK 1: Logo */}
           {showChurchBranding && logo ? (
-            <img src={logo} alt={church?.name} className="h-8 w-auto" />
+            <AppImage src={logo} alt="" className="h-24 max-w-48 object-contain" />
+          ) : showChurchBranding ? (
+            <span className="material-symbols-outlined text-3xl">church</span>
           ) : (
-            <div className="relative w-9 h-9 rounded-xl overflow-hidden border border-amber-400/30">
-              <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-                <source src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Book%20of%20Life%20-%20Christian%20-%20Video-uZ0vBJPjlZIbPlSRaiqQ0zfvwyuxsh.mp4" type="video/mp4" />
-              </video>
-            </div>
+            <video autoPlay loop muted playsInline aria-label="LifeStages tree of life and book" className="size-28 rounded-2xl object-cover"><source src="/images/lifestages-book-of-life.mp4" type="video/mp4" /></video>
           )}
           {/* BLOCK 2: Title */}
-          <div>
-            <h1 className="text-base font-bold text-white leading-tight">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold leading-tight break-words">
               {showChurchBranding && church ? church.name : "LifeStages"}
             </h1>
-            <p className="text-[10px] text-blue-200/50 font-medium tracking-wide">BIBLE FOR LIFE STAGES</p>
+            <p className="text-[10px] opacity-70 font-medium tracking-wide">{showChurchBranding ? "POWERED BY LIFESTAGES" : "BIBLE FOR LIFE STAGES"}</p>
           </div>
         </div>
-        <HeaderDropdown verseReference={devotional.verse?.reference} />
+        <div className="absolute top-3 right-4 flex items-center gap-1"><HeaderDropdown verseReference={devotional.verse?.reference} /></div>
       </header>
 
       {/* Scrollable Content */}
       <main className="flex-1 overflow-y-auto pb-24">
+
+        {showChurchBranding && church && <div className="px-5 pt-4 pb-1">
+          {church.welcome_message && <p className="text-sm text-blue-100/80 leading-relaxed whitespace-pre-line mb-3">{church.welcome_message}</p>}
+          <button onClick={() => { hapticTap(); router.push("/my-church") }} className="church-brand-button w-full flex items-center justify-center gap-2 rounded-xl py-3 px-4 text-sm font-semibold">
+            <span className="material-symbols-outlined text-lg">church</span>{language === "vi" ? "Hội thánh & liên hệ lãnh đạo" : "My church & leadership"}
+          </button>
+        </div>}
 
         {/* ========================================================
             BLOCK 3: Note (AI+Secure or Church's Last Week's Sermon)
@@ -202,27 +203,13 @@ export default function MobileHome() {
                 <span className="material-symbols-outlined text-amber-400">podium</span>
               </div>
               <div className="flex-1 text-left">
-                <p className="text-white text-sm font-semibold">Last Week&apos;s Sermon</p>
+                <p className="text-white text-sm font-semibold">{lastSermon.source === 'imported_recording' ? 'Latest church recording' : 'Latest sermon'}</p>
                 <p className="text-blue-200/50 text-xs truncate">{lastSermon.title}</p>
               </div>
               <span className="material-symbols-outlined text-amber-400/50 text-lg">chevron_right</span>
             </button>
           </div>
-        ) : (
-          /* Generic variant: AI + Secure badges */
-          <div className="px-5 pt-3 pb-2">
-            <div className="flex items-center justify-center gap-3">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-400/20">
-                <span className="material-symbols-outlined text-amber-400 text-sm">auto_awesome</span>
-                <span className="text-[10px] text-amber-300 font-semibold">AI-Powered</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-400/20">
-                <span className="material-symbols-outlined text-emerald-400 text-sm">lock</span>
-                <span className="text-[10px] text-emerald-300 font-semibold">Private & Secure</span>
-              </div>
-            </div>
-          </div>
-        )}
+        ) : null}
 
         {/* ========================================================
             BLOCK 4: Read the Bible
@@ -233,7 +220,7 @@ export default function MobileHome() {
           {/* This Week's Sermon Verses (Church only) */}
           {showChurchBranding && thisSermon && (
             <button
-              onClick={() => { hapticTap(); router.push(`/bible?verse=${encodeURIComponent(thisSermon.scripture)}`) }}
+              onClick={() => { hapticTap(); router.push(`/bible?verse=${encodeURIComponent(thisSermon.scripture)}${thisSermon.id && church ? `&sermonId=${encodeURIComponent(thisSermon.id)}&churchId=${encodeURIComponent(church.id)}` : ""}`) }}
               className="w-full flex items-center gap-3 p-2.5 mb-2.5 rounded-xl bg-purple-500/10 border border-purple-400/20 active:scale-[0.98] transition-transform"
             >
               <span className="material-symbols-outlined text-purple-400">church</span>
@@ -319,9 +306,9 @@ export default function MobileHome() {
 
         {/* ========================================================
             BLOCKS 8, 9, 10: VOTD Carousel (swipeable)
-            8. Verse of Day image (generic or personalized for paying)
-            9. Verse of the Day (generic or church-defined)
-            10. Friendly Breakdown (generic or personalized for paying)
+            8. Verse of Day image (or personalized for paying)
+            9. Verse of the Day (or church-defined)
+            10. Friendly Breakdown (or personalized for paying)
             ======================================================== */}
         <VOTDCarousel
           todayVerse={displayVerse ? { reference: displayVerse.reference, text: displayVerse.text } : undefined}
@@ -330,7 +317,7 @@ export default function MobileHome() {
           todayIsLoading={loadingStates.verse || isLoading}
           interpretationLoading={loadingStates.interpretation}
           canAccessPremium={canAccessPremium}
-          churchId={userProfile?.churchId}
+          churchId={church?.id}
           onRetry={handleRetry}
         />
 
@@ -353,7 +340,7 @@ export default function MobileHome() {
 
         {/* ========================================================
             BLOCK 11: Bringing Scripture to Life
-            (generic for free users, not shown for paying customers)
+            (for free users, not shown for paying customers)
             ======================================================== */}
         {!canAccessPremium && displayVerse && (
           <div className="px-5 pb-4">
@@ -367,8 +354,8 @@ export default function MobileHome() {
                     <span className="material-symbols-outlined text-amber-400 text-sm">star</span>
                     <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">Premium</span>
                   </div>
-                  <h3 className="text-xl font-bold text-white">Bring Scripture to Life</h3>
-                  <p className="text-sm text-blue-200/70 mt-1">AI-powered devotionals tailored to YOUR age, gender, and life stage</p>
+                  <h3 className="text-xl font-bold text-white">Premium Makes It Personal</h3>
+                  <Link href="/personalization" className="mt-2 block text-sm text-amber-300 underline underline-offset-4">See examples of personalized Premium content</Link>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 mb-5">
@@ -392,11 +379,11 @@ export default function MobileHome() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-white font-bold">What You Get:</p>
-                      <p className="text-xs text-blue-200/60">Full access to all features</p>
+                      <p className="text-xs text-blue-200/60">Personalized breakdowns, Lifelines, all content, and Text Chat</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-amber-400">$5<span className="text-sm text-blue-200/60">/mo</span></p>
-                      <p className="text-xs text-green-400">or $45/year (save 25%)</p>
+                      <p className="text-2xl font-bold text-amber-400">$4.99<span className="text-sm text-blue-200/60">/mo</span></p>
+                      <p className="text-xs text-green-400">or $49.99/year (save 16%)</p>
                     </div>
                   </div>
                 </div>
@@ -405,12 +392,12 @@ export default function MobileHome() {
                   onClick={() => { hapticTap(); router.push("/subscription") }}
                   className="w-full py-4 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 text-gray-900 rounded-xl font-bold text-lg shadow-xl active:scale-[0.98] transition-transform animate-pulse hover:animate-none"
                 >
-                  Start Your FREE 7-Day Trial
+                  {canStartTrial ? "Try Personalization Free for 7 Days" : "Make It Personal with Premium"}
                 </button>
                 <div className="flex items-center justify-center gap-4 mt-3">
                   <span className="flex items-center gap-1 text-xs text-green-400">
                     <span className="material-symbols-outlined text-sm">check_circle</span>
-                    Free for 7 days
+                    {canStartTrial ? "Free for 7 days" : "Choose monthly or yearly"}
                   </span>
                   <span className="flex items-center gap-1 text-xs text-green-400">
                     <span className="material-symbols-outlined text-sm">check_circle</span>
@@ -424,7 +411,7 @@ export default function MobileHome() {
 
         {/* ========================================================
             BLOCK 12: Quote from Sarah
-            (generic for free users, not shown for paying customers)
+            (for free users, not shown for paying customers)
             ======================================================== */}
         {!canAccessPremium && displayVerse && (
           <div className="px-5 pb-8">

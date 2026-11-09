@@ -1,9 +1,10 @@
+import { entitlementProfile, hasPremium } from '@/lib/entitlements'
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
 
 export async function POST(request: Request) {
   try {
-    const { verseReference, verseText, ageRange, contentStyle = "casual", language = "en", theme } = await request.json()
+    const { verseReference, verseText, ageRange, contentStyle = "casual", language = "en", theme } = await entitlementProfile(await request.json())
 
     const openrouter = createOpenRouter({
       apiKey: process.env.OPENROUTER_API_KEY!,
@@ -75,7 +76,7 @@ This is about the THEME itself - what the Bible teaches about ${theme}. Referenc
           prompt: `${themePrompt}
 
 Write your response now. Start directly with the content - no preamble.`,
-          maxTokens: contentStyle === "academic" ? 1800 : 1200,
+          maxOutputTokens: contentStyle === "academic" ? 1800 : 1200,
         })
 
         console.log("[API] Theme teaching raw response length:", text?.length)
@@ -148,7 +149,7 @@ INTERPRETATION===
 IMAGE_PROMPT===
 [Describe a beautiful LANDSCAPE or NATURE SCENE that evokes the feeling of this verse. Focus on: lighting, sky, terrain, atmosphere. Examples: "Golden sunset over calm ocean waters", "Misty mountain forest at dawn", "Peaceful meadow under starry sky". NEVER include the verse text, words, letters, or any writing in your description. Pure visual scenery only. 20-30 words.]
 ===IMAGE_PROMPT`,
-      maxTokens: contentStyle === "academic" ? 1500 : 1000,
+      maxOutputTokens: contentStyle === "academic" ? 1500 : 1000,
     })
 
     console.log("[API] Raw response length:", text?.length)

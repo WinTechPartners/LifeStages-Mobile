@@ -1,11 +1,11 @@
 {
   "name": "lifestages-mobile",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:mobile": "BUILD_TARGET=mobile next build",
+    "build:mobile": "node scripts/build-mobile.mjs",
     "start": "next start",
     "lint": "eslint .",
     "cap:sync": "npx cap sync",
@@ -13,9 +13,14 @@
     "cap:android": "npx cap open android",
     "mobile": "npm run build:mobile && npx cap sync",
     "mobile:ios": "npm run mobile && npx cap open ios",
-    "mobile:android": "npm run mobile && npx cap open android"
+    "mobile:android": "npm run mobile && npx cap open android",
+    "test": "node --test tests/*.test.mjs",
+    "test:fixture": "node tests/browser-fixture.mjs",
+    "typecheck": "tsc --noEmit --incremental false"
   },
   "dependencies": {
+    "@apple/app-store-server-library": "3.1.0",
+    "@capacitor/app-launcher": "6.0.4",
     "@capacitor/core": "^6.2.0",
     "@capacitor/haptics": "^6.0.0",
     "@capacitor/keyboard": "^6.0.0",
@@ -24,7 +29,6 @@
     "@capacitor/share": "^6.0.0",
     "@capacitor/splash-screen": "^6.0.0",
     "@capacitor/status-bar": "^6.0.0",
-    "@capgo/capacitor-purchases": "^6.0.0",
     "@hookform/resolvers": "^3.10.0",
     "@openrouter/ai-sdk-provider": "latest",
     "@radix-ui/react-accordion": "1.2.2",
@@ -71,6 +75,7 @@
     "next-themes": "^0.4.6",
     "node-cron": "^4.5.0",
     "papaparse": "^5.5.3",
+    "pg": "^8.23.1",
     "react": "19.2.0",
     "react-day-picker": "9.8.0",
     "react-dom": "19.2.0",
@@ -92,6 +97,7 @@
     "@tailwindcss/postcss": "^4.1.9",
     "@types/node": "^22",
     "@types/papaparse": "^5.5.2",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "postcss": "^8.5",

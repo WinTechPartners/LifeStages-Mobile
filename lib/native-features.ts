@@ -229,7 +229,7 @@ export function getOfflineVerse(): CachedVerse | null {
  */
 export function getCachedVerseForDate(date: string): CachedVerse | null {
   try {
-    const cached = localStorage.getItem(`votd_${date}`)
+    const cached = localStorage.getItem(`votd_v3_${date}`)
     return cached ? JSON.parse(cached) : null
   } catch (e) {
     return null
@@ -246,7 +246,7 @@ export function cacheVerseForDate(date: string, verse: {
   heroImage?: string
 }) {
   try {
-    localStorage.setItem(`votd_${date}`, JSON.stringify({
+    localStorage.setItem(`votd_v3_${date}`, JSON.stringify({
       ...verse,
       date,
       cachedAt: new Date().toISOString(),

@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server'
+import { getPublishedSermonsForChurch } from '@/lib/church-management/server'
+import { publicChurchConfig } from '@/lib/church-public'
+import { getLatestImportedSermonForChurch } from '@/lib/sermon-automation/server'
 import {
   getChurchBySlug,
   updateChurch,
@@ -7,6 +10,7 @@ import {
   upsertCustomVerse,
   deleteCustomVerse,
   getTrueTeachingsSermons,
+  getLastSermonId,
   getChurchMemberStats,
   getChurchLifelineStats
 } from '@/lib/church'
@@ -38,28 +42,11 @@ export async function GET(request: Request) {
 
     // Public info (no admin check needed) - includes sermon data for member app
     if (action === 'info') {
-      const response = {
-        id: church.id,
-        slug: church.slug,
-        name: church.name,
-        logo_url: church.logo_url,
-        primary_color: church.primary_color,
-        secondary_color: church.secondary_color,
-        denomination: church.denomination,
-        // Sermon settings for the member-facing app
-        sermon_review_enabled: church.sermon_review_enabled,
-        sermon_prep_enabled: church.sermon_prep_enabled,
-        // Last week's sermon
-        last_sermon_title: church.last_sermon_title,
-        last_sermon_youtube_url: church.last_sermon_youtube_url,
-        last_sermon_summary: church.last_sermon_summary,
-        // This week's sermon
-        current_sermon_title: church.current_sermon_title,
-        current_sermon_scripture: church.current_sermon_scripture,
-        current_sermon_theme: church.current_sermon_theme,
-      }
-      console.log('[Church API] Returning info response:', response)
-      return NextResponse.json(response)
+      const published = await getPublishedSermonsForChurch(church.id, 1).catch(() => [])
+      const imported = await getLatestImportedSermonForChurch(church.id).catch(() => null)
+      const manualIsCurrent = published[0] && (!church.last_sermon_date || published[0].sermon_date >= church.last_sermon_date.slice(0, 10))
+      const lastSermonId = manualIsCurrent ? undefined : await getLastSermonId(church).catch(() => undefined)
+      return NextResponse.json(publicChurchConfig(church, published[0], lastSermonId, imported), { headers: { 'Cache-Control': 'no-store' } })
     }
 
     // Admin-only actions require email verification

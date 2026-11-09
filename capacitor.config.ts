@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.lifestagesai.bible',
+  appId: 'com.bibleforlifestages',
   appName: 'LifeStages Bible',
   
   // CRITICAL: Bundle from local static export, NOT a remote URL
@@ -17,7 +17,8 @@ const config: CapacitorConfig = {
       launchAutoHide: true,
       backgroundColor: '#0c1929',
       showSpinner: true,
-      spinnerStyle: 'large',
+      androidSpinnerStyle: 'large',
+      iosSpinnerStyle: 'large',
       spinnerColor: '#f59e0b',
       splashFullScreen: true,
       splashImmersive: true,

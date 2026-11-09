@@ -1,4 +1,6 @@
 "use client"
+import Link from "next/link"
+import { AppImage } from "@/components/app-image"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -6,55 +8,15 @@ import { useDevotional } from "@/context/devotional-context"
 import { useSubscription } from "@/context/subscription-context"
 import { useChurch } from "@/context/church-context"
 import { HeaderDropdown } from "@/components/header-dropdown"
+import { LIFELINE_TOPICS, LIFELINE_CATEGORIES, lifeLineUrl } from "@/lib/lifelines"
+import { track } from "@/lib/analytics/client"
 
-const LIFELINE_TOPICS = [
-  // 1. Family & Relationships
-  { id: "struggling-with-family", label: "Struggling with Family", icon: "home", category: "family" },
-  { id: "impact-of-divorce", label: "Impact of Divorce", icon: "link_off", category: "family" },
-  { id: "relationship-conflicts", label: "Relationship Conflicts", icon: "sync_problem", category: "family" },
-  { id: "wayward-loved-ones", label: "Wayward Loved Ones", icon: "directions_walk", category: "family" },
-  { id: "forgiving-someone", label: "Forgiving Someone", icon: "handshake", category: "family" },
-  { id: "difficulty-trusting-others", label: "Difficulty Trusting Others", icon: "shield", category: "family" },
-  // 2. Health & Loss
-  { id: "physical-health-battles", label: "Physical Health Battles", icon: "local_hospital", category: "health" },
-  { id: "chronic-pain-disability", label: "Chronic Pain / Disability", icon: "accessible", category: "health" },
-  { id: "grieving-a-loss", label: "Grieving a Loss", icon: "sentiment_sad", category: "health" },
-  { id: "infertility-pregnancy-loss", label: "Infertility & Pregnancy Loss", icon: "child_friendly", category: "health" },
-  { id: "special-needs-autism", label: "Special Needs & Autism", icon: "neurology", category: "health" },
-  { id: "caring-for-aging-parents", label: "Caring for Aging Parents", icon: "elderly", category: "health" },
-  // 3. Mental & Emotional
-  { id: "feeling-stressed", label: "Feeling Stressed", icon: "speed", category: "mental" },
-  { id: "anxiety-worry", label: "Anxiety & Worry", icon: "sentiment_stressed", category: "mental" },
-  { id: "depression-low-mood", label: "Depression & Low Mood", icon: "cloud", category: "mental" },
-  { id: "burnout-exhaustion", label: "Burnout & Exhaustion", icon: "battery_0_bar", category: "mental" },
-  { id: "anger-frustration", label: "Anger & Frustration", icon: "mood_bad", category: "mental" },
-  { id: "feeling-invisible", label: "Feeling Invisible", icon: "visibility_off", category: "mental" },
-  // 4. Work & Finances
-  { id: "financial-issues", label: "Financial Issues", icon: "money_off", category: "work" },
-  { id: "workplace-school-tension", label: "Workplace or School Tension", icon: "business", category: "work" },
-  { id: "career-academic-uncertainty", label: "Career or Academic Uncertainty", icon: "explore", category: "work" },
-  { id: "making-hard-decision", label: "Making a Hard Decision", icon: "call_split", category: "work" },
-  // 5. Faith & Purpose
-  { id: "continuing-faith-journey", label: "Continuing My Faith Journey", icon: "route", category: "faith" },
-  { id: "questioning-beliefs", label: "Questioning My Beliefs", icon: "help", category: "faith" },
-  { id: "finding-purpose", label: "Finding My Purpose", icon: "lightbulb", category: "faith" },
-  { id: "feeling-far-from-god", label: "Feeling Far from God", icon: "cloud_off", category: "faith" },
-  { id: "unanswered-prayer", label: "Unanswered Prayer", icon: "hourglass_empty", category: "faith" },
-  // 6. Self & Identity
-  { id: "doubting-my-value", label: "Doubting My Value", icon: "self_improvement", category: "identity" },
-  { id: "body-image-struggles", label: "Body Image Struggles", icon: "body_system", category: "identity" },
-  { id: "comparison-envy", label: "Comparison & Envy", icon: "compare", category: "identity" },
-  { id: "guilt-shame", label: "Dealing with Guilt & Shame", icon: "weight", category: "identity" },
-  // 7. Trials & Temptation
-  { id: "addiction-issues", label: "Addiction Issues", icon: "psychology_alt", category: "trials" },
-  { id: "battling-temptation", label: "Battling Temptation", icon: "shield", category: "trials" },
-  { id: "fear-of-future", label: "Fear of the Future", icon: "schedule", category: "trials" },
-]
+
 
 export default function VersePageContent() {
   const router = useRouter()
   const { devotional } = useDevotional()
-  const { canAccessCore, tier } = useSubscription()
+  const { canAccessCore, canAccessPremium, tier } = useSubscription()
   const { hasChurch, logo, church, isLoading: churchLoading } = useChurch()
   const [showLifelinesModal, setShowLifelinesModal] = useState(false)
 
@@ -71,15 +33,17 @@ export default function VersePageContent() {
     const topic = LIFELINE_TOPICS.find(t => t.id === topicId)
     if (topic) {
       setShowLifelinesModal(false)
-      router.push(`/deep-dive?topic=${encodeURIComponent(topic.label)}`)
+      track("lifeline_selected", { topicId: topic.id })
+      router.push(lifeLineUrl(topic))
     }
   }
 
-  const lifelinesLimitText = tier === "free" ? "Upgrade for access" : tier === "core" ? "1/day" : "5/day"
+  const lifelinesLimitText = tier === "free" ? "Free with email" : "Personalized with Premium"
   const showChurchBranding = hasChurch && !churchLoading
 
   return (
     <div className="relative flex min-h-screen w-full flex-col max-w-md mx-auto bg-[#0c1929] shadow-2xl">
+      {!canAccessPremium && <Link href="/personalization" className="block px-6 pt-5 pr-16 text-sm text-amber-300 underline underline-offset-4">See examples of personalized Premium content</Link>}
       {/* Three Dots Menu */}
       <div className="absolute top-4 right-4 z-20">
         <HeaderDropdown verseReference={devotional.verse?.reference} />
@@ -121,15 +85,7 @@ export default function VersePageContent() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {[
-                    { cat: "family", title: "Family & Relationships", color: "rose" },
-                    { cat: "health", title: "Health & Loss", color: "emerald" },
-                    { cat: "mental", title: "Mental & Emotional", color: "blue" },
-                    { cat: "work", title: "Work & Finances", color: "amber" },
-                    { cat: "faith", title: "Faith & Purpose", color: "purple" },
-                    { cat: "identity", title: "Self & Identity", color: "cyan" },
-                    { cat: "trials", title: "Trials & Temptation", color: "orange" },
-                  ].map(({ cat, title, color }) => (
+                  {LIFELINE_CATEGORIES.map(({ id: cat, name: title, color }) => (
                     <div key={cat}>
                       <h4 className={`text-xs font-bold text-${color}-400 uppercase tracking-wider mb-3`}>{title}</h4>
                       <div className="grid grid-cols-2 gap-2">
@@ -160,7 +116,7 @@ export default function VersePageContent() {
         <div className="flex flex-col items-center text-center px-6 pt-8 pb-4">
           {showChurchBranding && logo ? (
             <>
-              <img src={logo} alt={church?.name || "Church"} className="h-20 w-auto mb-3" />
+              <AppImage src={logo} alt={church?.name || "Church"} className="h-20 w-auto mb-3" />
               <h1 className="text-xl font-bold tracking-tight text-white">{church?.name}</h1>
               <p className="text-xs text-blue-200/80 mt-1">Scripture that speaks to where you are</p>
             </>
@@ -176,7 +132,7 @@ export default function VersePageContent() {
             <>
               <div className="relative w-24 h-24 rounded-2xl overflow-hidden shadow-xl border-2 border-amber-400/30 mb-3">
                 <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-                  <source src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Book%20of%20Life%20-%20Christian%20-%20Video-uZ0vBJPjlZIbPlSRaiqQ0zfvwyuxsh.mp4" type="video/mp4" />
+                  <source src="/images/lifestages-book-of-life.mp4" type="video/mp4" />
                 </video>
               </div>
               <h1 className="text-xl font-bold tracking-tight text-white">Bible for Life Stages</h1>
@@ -216,7 +172,7 @@ export default function VersePageContent() {
             
             <div className="grid grid-cols-2 gap-3 mb-4">
               {features.map((item, idx) => {
-                const isLocked = !canAccessCore
+                const isLocked = false
                 return (
                   <button
                     key={idx}
@@ -245,8 +201,8 @@ export default function VersePageContent() {
                 <span className="material-symbols-outlined">forum</span>
               </div>
               <div className="flex-1 text-left">
-                <span className="font-bold text-gray-900 block">Let's Talk</span>
-                <span className="text-xs text-indigo-600 font-medium">Chat about today's verse</span>
+                <span className="font-bold text-gray-900 block">Text Chat</span>
+
               </div>
               <span className="material-symbols-outlined text-gray-400">arrow_forward</span>
             </button>
@@ -256,17 +212,18 @@ export default function VersePageContent() {
         {/* Find a Verse */}
         <div className="px-4 pb-4">
           <button
-            onClick={() => canAccessCore ? router.push("/selection") : router.push("/subscription")}
-            className="w-full flex items-center p-4 bg-gray-900/50 backdrop-blur rounded-xl border border-amber-400/30 transition-all active:scale-[0.98]"
+            disabled
+            aria-label="Find a Verse — Coming soon"
+            className="w-full flex items-center p-4 bg-gray-900/50 backdrop-blur rounded-xl border border-amber-400/20 opacity-60 cursor-not-allowed"
           >
             <div className="size-10 rounded-full bg-amber-500 text-white flex items-center justify-center mr-3">
               <span className="material-symbols-outlined">search</span>
             </div>
             <div className="flex-1 text-left">
               <span className="font-bold text-white block">Find a Verse</span>
-              <span className="text-xs text-blue-200/70 font-medium">Search any scripture by reference</span>
+              <span className="text-xs text-blue-200/70 font-medium">Coming soon</span>
             </div>
-            <span className="material-symbols-outlined text-amber-400">arrow_forward</span>
+            <span className="material-symbols-outlined text-amber-400">schedule</span>
           </button>
         </div>
 

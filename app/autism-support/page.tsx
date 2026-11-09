@@ -1,7 +1,7 @@
 "use client"
 
 
-import { apiUrl } from "@/lib/api-base"
+import { apiFetch } from "@/lib/api-base"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useDevotional } from "@/context/devotional-context"
@@ -14,7 +14,8 @@ export default function AutismSupportPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!devotional.verse) {
+    const verse = devotional.verse
+    if (!verse) {
       router.push("/")
       return
     }
@@ -39,12 +40,12 @@ export default function AutismSupportPage() {
           }
         } catch (e) { /* ignore */ }
 
-        const response = await fetch(apiUrl("/api/generate-autism-support", {
+        const response = await apiFetch("/api/generate-autism-support", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            verseReference: devotional.verse.reference,
-            verseText: devotional.verse.text,
+            verseReference: verse.reference,
+            verseText: verse.text,
             ageRange,
             gender,
             stageSituation,

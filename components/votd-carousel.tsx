@@ -1,7 +1,9 @@
 "use client"
+import { AppImage } from "@/components/app-image"
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { hapticMedium, hapticTap, nativeShare, getCachedVerseForDate, cacheVerseForDate, type CachedVerse } from "@/lib/native-features"
+import { requestVerseImage } from "@/lib/verse-image"
 import { apiUrl } from "@/lib/api-base"
 
 interface VOTDDay {
@@ -58,6 +60,9 @@ export function VOTDCarousel({
   churchId,
   onRetry,
 }: VOTDCarouselProps) {
+  const [imageLoading, setImageLoading] = useState(false)
+  const [imageFailed, setImageFailed] = useState(false)
+  const [imageAttempt, setImageAttempt] = useState(0)
   const TOTAL_DAYS = 8 // today + 7 previous
   const dates = getPastDates(TOTAL_DAYS)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -107,13 +112,27 @@ export function VOTDCarousel({
           ...day,
           verse: todayVerse,
           interpretation: todayInterpretation,
-          heroImage: todayHeroImage,
+          heroImage: todayHeroImage || (day.verse?.reference === todayVerse?.reference ? day.heroImage : undefined),
           isLoading: todayIsLoading,
         }
       }
       return day
     }))
   }, [todayVerse, todayInterpretation, todayHeroImage, todayIsLoading])
+
+  // Artwork has its own lifecycle; stale responses cannot replace a new verse.
+  useEffect(() => {
+    if (!todayVerse?.reference || todayHeroImage) { setImageLoading(false); return }
+    const controller = new AbortController()
+    let active = true
+    setImageLoading(true)
+    setImageFailed(false)
+    requestVerseImage(apiUrl('/api/generate-image'), todayVerse, controller.signal)
+      .then(imageUrl => { if (active && !imageUrl) setImageFailed(true); if (active && imageUrl) setDays(prev => prev.map((day, i) => i === 0 ? {...day, heroImage:imageUrl} : day)) })
+      .catch(() => { if (active) setImageFailed(true) })
+      .finally(() => { if (active) setImageLoading(false) })
+    return () => { active=false; controller.abort() }
+  }, [todayVerse?.reference, todayVerse?.text, todayHeroImage, imageAttempt])
 
   // Fetch a previous day's verse from API
   const fetchDayVerse = useCallback(async (date: string, index: number) => {
@@ -319,10 +338,10 @@ export function VOTDCarousel({
                 {/* Hero Image */}
                 {day.heroImage ? (
                   <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/40">
-                    <img
+                    <AppImage
                       src={day.heroImage}
                       alt="Verse illustration"
-                      className="w-full aspect-[16/10] object-cover"
+                      className="w-full h-40 object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0c1929] via-transparent to-transparent" />
                     <button
@@ -331,23 +350,16 @@ export function VOTDCarousel({
                     >
                       <span className="material-symbols-outlined text-white text-lg">share</span>
                     </button>
-                    {!canAccessPremium && (
-                      <div className="absolute bottom-3 left-3 px-2 py-1 rounded-md bg-black/40 backdrop-blur-sm">
-                        <span className="text-[9px] text-blue-200/60">Generic image</span>
-                      </div>
-                    )}
                   </div>
-                ) : day.isLoading || (day.isToday && todayIsLoading) ? (
-                  <div className="w-full aspect-[16/10] bg-gradient-to-br from-indigo-900/40 to-blue-900/40 rounded-2xl flex flex-col items-center justify-center border border-white/5">
+                ) : day.isLoading || (day.isToday && imageLoading) ? (
+                  <div className="w-full h-40 bg-gradient-to-br from-indigo-900/40 to-blue-900/40 rounded-2xl flex flex-col items-center justify-center border border-white/5">
                     <div className="size-8 border-3 border-amber-400/40 border-t-amber-400 rounded-full animate-spin mb-2" />
                     <p className="text-xs text-blue-200/40">Creating your image...</p>
                   </div>
-                ) : day.verse ? (
-                  <div className="w-full aspect-[16/10] bg-gradient-to-br from-indigo-900/30 to-purple-900/30 rounded-2xl flex items-center justify-center border border-white/5">
-                    <span className="material-symbols-outlined text-amber-400/30 text-5xl">image</span>
-                  </div>
                 ) : null}
               </div>
+
+              {day.isToday && imageFailed && !day.heroImage && <button onClick={() => setImageAttempt(value => value + 1)} className="mb-3 text-sm text-amber-300 underline">Retry illustration</button>}
 
               {/* Verse Text */}
               <div className="py-4">
@@ -399,9 +411,9 @@ export function VOTDCarousel({
                         <span className="material-symbols-outlined text-white text-base">auto_awesome</span>
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-white">What This Means For You</h3>
+                        <h3 className="text-sm font-bold text-white">Friendly Breakdown</h3>
                         {!canAccessPremium && (
-                          <span className="text-[9px] text-blue-200/40">Generic · Upgrade for personalized</span>
+                          <span className="text-[9px] text-blue-200/40">Premium adds personalization.</span>
                         )}
                       </div>
                     </div>
@@ -415,7 +427,7 @@ export function VOTDCarousel({
                       <div className="size-8 rounded-full bg-white/10 flex items-center justify-center">
                         <div className="size-4 border-2 border-amber-400/40 border-t-amber-400 rounded-full animate-spin" />
                       </div>
-                      <h3 className="text-sm font-bold text-white/40">Personalizing for you...</h3>
+                      <h3 className="text-sm font-bold text-white/40">Loading Friendly Breakdown...</h3>
                     </div>
                     <div className="space-y-2">
                       <div className="h-3.5 bg-white/[0.06] rounded-lg animate-pulse" />

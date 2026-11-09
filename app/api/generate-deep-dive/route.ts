@@ -62,7 +62,7 @@ Then write a warm 80-120 word reflection. Be honest about the fit. NO URLS.`
       model: openrouter(modelId),
       system: systemPrompt,
       prompt,
-      maxTokens: isSermonMode ? 400 : 250,
+      maxOutputTokens: isSermonMode ? 400 : 250,
     })
 
     // Clean up any URLs or website references

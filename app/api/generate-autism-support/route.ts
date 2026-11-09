@@ -51,7 +51,7 @@ Write 3-4 paragraphs (about 250-350 words total). Make it feel like a warm hug f
 The reader is ${ageRange || "an adult"}, ${gender || "a parent"}, currently experiencing: ${stageSituation || "daily life with autism"}.
 
 Write a reflection that helps them see this verse through their autism family lens. Be specific, compassionate, and real.`,
-      maxTokens: 1500,
+      maxOutputTokens: 1500,
     })
 
     return Response.json({ reflection: text })

@@ -9,6 +9,11 @@ export interface Church {
   id: string
   slug: string
   name: string
+  welcome_message?: string | null
+  leadership_contact_name?: string | null
+  leadership_contact_email?: string | null
+  leadership_contact_phone?: string | null
+  leadership_contact_url?: string | null
   logo_url: string | null
   primary_color: string
   secondary_color: string
@@ -29,6 +34,8 @@ export interface Church {
   current_sermon_theme: string | null
   current_sermon_scripture: string | null
   last_sermon_title: string | null
+  // Resolved from an exact archive source match; not a churches-table column.
+  last_sermon_id?: string
   last_sermon_date: string | null
   last_sermon_youtube_id: string | null
   last_sermon_youtube_url: string | null
@@ -386,6 +393,33 @@ export async function getTrueTeachingsSermons(
   }
 
   return data || []
+}
+
+/** Resolve only the archive record for the configured sermon, never an arbitrary latest row. */
+export async function getLastSermonId(church: Church): Promise<string | undefined> {
+  let youtubeId = church.last_sermon_youtube_id || undefined
+  if (!youtubeId && church.last_sermon_youtube_url) {
+    try {
+      const url = new URL(church.last_sermon_youtube_url)
+      const host = url.hostname.replace(/^www\./, '')
+      if (host === 'youtu.be') youtubeId = url.pathname.split('/')[1]
+      if (host === 'youtube.com' || host === 'm.youtube.com') {
+        youtubeId = url.searchParams.get('v') || url.pathname.match(/^\/(?:embed|shorts)\/([^/]+)/)?.[1]
+      }
+    } catch { /* A malformed source cannot identify an archive record. */ }
+  }
+  let query = supabaseAdmin.from('trueteachings_sermons').select('id').eq('church_id', church.id)
+  if (youtubeId && /^[\w-]{11}$/.test(youtubeId)) {
+    query = query.eq('youtube_id', youtubeId)
+  } else if (!youtubeId && !church.last_sermon_youtube_url && church.last_sermon_date && church.last_sermon_title) {
+    query = query.eq('sermon_date', church.last_sermon_date).eq('title', church.last_sermon_title)
+  } else {
+    return undefined
+  }
+  const { data, error } = await query.limit(2)
+  if (error || data?.length !== 1) return undefined
+  const id = data[0].id
+  return typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) ? id : undefined
 }
 
 export async function addTrueTeachingsSermon(
