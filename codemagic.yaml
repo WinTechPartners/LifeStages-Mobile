@@ -8,6 +8,8 @@ workflows:
       node: 20.11.0
       xcode: latest
       cocoapods: default
+      groups:
+        - ios-credentials
       vars:
         NEXT_PUBLIC_API_BASE_URL: https://bibleforlifestages.com
         BUILD_TARGET: mobile
