@@ -14,6 +14,7 @@ interface VOTDDay {
   interpretation?: string
   heroImage?: string
   isLoading: boolean
+  imageGenerating?: boolean
   isToday: boolean
 }
 
@@ -26,6 +27,7 @@ interface VOTDCarouselProps {
   canAccessPremium: boolean
   churchId?: string | null
   onRetry: () => void
+  onDayChange?: (day: { date: string; isToday: boolean; verse?: { reference: string; text: string } }) => void
 }
 
 function formatDateLabel(dateStr: string): string {
@@ -59,6 +61,7 @@ export function VOTDCarousel({
   canAccessPremium,
   churchId,
   onRetry,
+  onDayChange,
 }: VOTDCarouselProps) {
   const [imageLoading, setImageLoading] = useState(false)
   const [imageFailed, setImageFailed] = useState(false)
@@ -134,6 +137,32 @@ export function VOTDCarousel({
     return () => { active=false; controller.abort() }
   }, [todayVerse?.reference, todayVerse?.text, todayHeroImage, imageAttempt])
 
+  // Generate (or fetch the server-cached) illustration for a previous day.
+  // The devotional API does not return artwork, so past days need this explicitly.
+  const imageRequested = useRef<Set<string>>(new Set())
+  const ensureDayImage = useCallback(async (date: string, index: number, verse: { reference: string; text: string }) => {
+    if (imageRequested.current.has(date)) return
+    imageRequested.current.add(date)
+    setDays(prev => prev.map((d, i) => i === index ? { ...d, isLoading: d.verse ? false : d.isLoading, imageGenerating: true } : d))
+    try {
+      const imageUrl = await requestVerseImage(apiUrl('/api/generate-image'), verse, new AbortController().signal)
+      if (imageUrl) {
+        setDays(prev => prev.map((d, i) => i === index ? { ...d, heroImage: imageUrl } : d))
+        const existing = getCachedVerseForDate(date)
+        cacheVerseForDate(date, {
+          reference: verse.reference,
+          text: verse.text,
+          interpretation: existing?.interpretation,
+          heroImage: imageUrl,
+        })
+      }
+    } catch {
+      // Leave the flag set so a failed day is not retried in a loop; remount retries.
+    } finally {
+      setDays(prev => prev.map((d, i) => i === index ? { ...d, imageGenerating: false } : d))
+    }
+  }, [])
+
   // Fetch a previous day's verse from API
   const fetchDayVerse = useCallback(async (date: string, index: number) => {
     if (fetchedDates.current.has(date)) return
@@ -149,6 +178,7 @@ export function VOTDCarousel({
         heroImage: cached.heroImage,
         isLoading: false,
       } : d))
+      if (!cached.heroImage) void ensureDayImage(date, index, { reference: cached.reference, text: cached.text })
       return
     }
 
@@ -170,6 +200,9 @@ export function VOTDCarousel({
 
       // Update immediately with verse
       setDays(prev => prev.map((d, i) => i === index ? { ...d, verse, isLoading: false } : d))
+
+      // Start artwork in parallel with the devotional text
+      void ensureDayImage(date, index, verse)
 
       // Try to get cached devotional content for this verse
       const profileRaw = localStorage.getItem("userProfile")
@@ -198,22 +231,23 @@ export function VOTDCarousel({
         setDays(prev => prev.map((d, i) => i === index ? {
           ...d,
           interpretation,
-          heroImage,
+          heroImage: heroImage || d.heroImage,
         } : d))
 
-        // Cache for future
+        // Cache for future (keep any artwork that finished first)
+        const existing = getCachedVerseForDate(date)
         cacheVerseForDate(date, {
           reference: verse.reference,
           text: verse.text,
           interpretation,
-          heroImage,
+          heroImage: heroImage || existing?.heroImage,
         })
       }
     } catch (e) {
       console.error(`[VOTDCarousel] Failed to fetch verse for ${date}:`, e)
       setDays(prev => prev.map((d, i) => i === index ? { ...d, isLoading: false } : d))
     }
-  }, [churchId])
+  }, [churchId, ensureDayImage])
 
   // Prefetch adjacent days when index changes
   useEffect(() => {
@@ -221,12 +255,17 @@ export function VOTDCarousel({
     if (currentIndex > 0 && !days[currentIndex]?.verse) {
       fetchDayVerse(dates[currentIndex], currentIndex)
     }
+    // Verse loaded from cache without artwork: generate it
+    const cur = days[currentIndex]
+    if (currentIndex > 0 && cur?.verse && !cur.heroImage) {
+      void ensureDayImage(dates[currentIndex], currentIndex, cur.verse)
+    }
     // Prefetch next day too
     const nextIdx = currentIndex + 1
     if (nextIdx < TOTAL_DAYS && !days[nextIdx]?.verse) {
       fetchDayVerse(dates[nextIdx], nextIdx)
     }
-  }, [currentIndex, days, dates, fetchDayVerse])
+  }, [currentIndex, days, dates, fetchDayVerse, ensureDayImage])
 
   // Touch handlers for swipe
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -281,6 +320,11 @@ export function VOTDCarousel({
   }
 
   const day = days[currentIndex]
+
+  useEffect(() => {
+    if (!day || !onDayChange) return
+    onDayChange({ date: day.date, isToday: day.isToday, verse: day.verse })
+  }, [day?.date, day?.isToday, day?.verse?.reference, day?.verse?.text]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="relative">
@@ -351,7 +395,7 @@ export function VOTDCarousel({
                       <span className="material-symbols-outlined text-white text-lg">share</span>
                     </button>
                   </div>
-                ) : day.isLoading || (day.isToday && imageLoading) ? (
+                ) : day.isLoading || day.imageGenerating || (day.isToday && imageLoading) ? (
                   <div className="w-full h-40 bg-gradient-to-br from-indigo-900/40 to-blue-900/40 rounded-2xl flex flex-col items-center justify-center border border-white/5">
                     <div className="size-8 border-3 border-amber-400/40 border-t-amber-400 rounded-full animate-spin mb-2" />
                     <p className="text-xs text-blue-200/40">Creating your image...</p>

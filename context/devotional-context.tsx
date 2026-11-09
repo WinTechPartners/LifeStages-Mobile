@@ -100,8 +100,9 @@ interface DevotionalContextType {
   loadingStep: string
   setLoadingStep: React.Dispatch<React.SetStateAction<string>>
   loadingStates: LoadingStates
-  generateDevotional: (source?: string) => Promise<void>
+  generateDevotional: (source?: string, verseOverride?: VerseData) => Promise<void>
   generateForVerse: (verseQuery: string) => Promise<void>
+  generateForPastVerse: (verse: VerseData, date: string) => Promise<void>
   userName: string
   setUserName: React.Dispatch<React.SetStateAction<string>>
   clearCache: () => void
@@ -312,7 +313,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
   /**
    * MAIN: Generate devotional
    */
-  const generateDevotional = useCallback(async (source = "YouVersion") => {
+  const generateDevotional = useCallback(async (source = "YouVersion", verseOverride?: VerseData) => {
     // The profile stores a church code; APIs require the resolved church UUID.
     if (churchLoading) return
     // STRICT duplicate prevention
@@ -339,7 +340,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
     setLoadingStep("Finding today's verse...")
 
     try {
-      const verse = await getVerseFast(source, profile.churchId)
+      const verse = verseOverride ?? await getVerseFast(source, profile.churchId)
       
       if (!verse) {
         throw new Error("No verse available")
@@ -397,6 +398,13 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
     await generateDevotional(verseQuery)
   }, [generateDevotional])
 
+  // Load the full devotional (context, stories, poetry...) for a previous day's verse.
+  const generateForPastVerse = useCallback(async (verse: VerseData, date: string) => {
+    lastLoadedKeyRef.current = null
+    premiumGeneratedRef.current = false
+    await generateDevotional(`Past:${date}`, verse)
+  }, [generateDevotional])
+
   const clearCache = useCallback(() => {
     lastLoadedKeyRef.current = null
     premiumGeneratedRef.current = false
@@ -435,6 +443,7 @@ export function DevotionalProvider({ children }: { children: ReactNode }) {
         loadingStates,
         generateDevotional,
         generateForVerse,
+        generateForPastVerse,
         userName,
         setUserName,
         clearCache,
