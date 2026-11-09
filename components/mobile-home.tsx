@@ -356,7 +356,7 @@ export default function MobileHome() {
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.15),transparent_60%)]" />
               <div className="relative flex items-center justify-center gap-2">
                 <span className="material-symbols-outlined text-xl">auto_awesome</span>
-                {openingDeeper ? "Loading..." : selectedDay && !selectedDay.isToday ? `Go Deeper on ${selectedDay.verse?.reference ?? "this verse"}` : "Go Deeper"}
+                {openingDeeper ? t("loading") : selectedDay && !selectedDay.isToday && selectedDay.verse ? t("goDeeperOn").replace("{ref}", selectedDay.verse.reference) : t("goDeeper")}
               </div>
             </button>
           </div>

@@ -5,6 +5,9 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { hapticMedium, hapticTap, nativeShare, getCachedVerseForDate, cacheVerseForDate, type CachedVerse } from "@/lib/native-features"
 import { requestVerseImage } from "@/lib/verse-image"
 import { apiUrl } from "@/lib/api-base"
+import { useLanguage, type LanguageCode } from "@/context/language-context"
+
+const DATE_LOCALES: Record<LanguageCode, string> = { en: "en-US", es: "es-MX", fr: "fr-FR", de: "de-DE", it: "it-IT", ja: "ja-JP", ko: "ko-KR", pt: "pt-BR", vi: "vi-VN", zh: "zh-CN", th: "th-TH" }
 
 interface VOTDDay {
   date: string
@@ -30,16 +33,16 @@ interface VOTDCarouselProps {
   onDayChange?: (day: { date: string; isToday: boolean; verse?: { reference: string; text: string } }) => void
 }
 
-function formatDateLabel(dateStr: string): string {
+function formatDateLabel(dateStr: string, locale = "en-US"): string {
   const date = new Date(dateStr + "T12:00:00")
-  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+  return date.toLocaleDateString(locale, { weekday: "short", month: "short", day: "numeric" })
 }
 
-function getDayLabel(dateStr: string, index: number): string {
-  if (index === 0) return "Today"
-  if (index === 1) return "Yesterday"
+function getDayLabel(dateStr: string, index: number, t: (key: string) => string, locale = "en-US"): string {
+  if (index === 0) return t("today")
+  if (index === 1) return t("yesterday")
   const date = new Date(dateStr + "T12:00:00")
-  return date.toLocaleDateString("en-US", { weekday: "long" })
+  return date.toLocaleDateString(locale, { weekday: "long" })
 }
 
 function getPastDates(count: number): string[] {
@@ -63,6 +66,8 @@ export function VOTDCarousel({
   onRetry,
   onDayChange,
 }: VOTDCarouselProps) {
+  const { t, language } = useLanguage()
+  const locale = DATE_LOCALES[language] || "en-US"
   const [imageLoading, setImageLoading] = useState(false)
   const [imageFailed, setImageFailed] = useState(false)
   const [imageAttempt, setImageAttempt] = useState(0)
@@ -83,7 +88,7 @@ export function VOTDCarousel({
         return {
           date,
           dateLabel: formatDateLabel(date),
-          dayLabel: "Today",
+          dayLabel: "",
           verse: todayVerse,
           interpretation: todayInterpretation,
           heroImage: todayHeroImage,
@@ -96,7 +101,7 @@ export function VOTDCarousel({
       return {
         date,
         dateLabel: formatDateLabel(date),
-        dayLabel: getDayLabel(date, i),
+        dayLabel: "",
         verse: cached ? { reference: cached.reference, text: cached.text } : undefined,
         interpretation: cached?.interpretation,
         heroImage: cached?.heroImage,
@@ -320,6 +325,8 @@ export function VOTDCarousel({
   }
 
   const day = days[currentIndex]
+  const dayLabelText = getDayLabel(dates[currentIndex], currentIndex, t, locale)
+  const dateLabelText = day ? formatDateLabel(day.date, locale) : ""
 
   useEffect(() => {
     if (!day || !onDayChange) return
@@ -332,10 +339,10 @@ export function VOTDCarousel({
       <div className="px-5 pb-2">
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs font-semibold text-amber-400/80">
-            {day?.dayLabel || "Today"}
+            {day ? dayLabelText : t("today")}
           </p>
           <p className="text-[10px] text-blue-200/40">
-            {day?.dateLabel}
+            {dateLabelText}
           </p>
         </div>
         <div className="flex items-center justify-center gap-1.5">
@@ -374,7 +381,7 @@ export function VOTDCarousel({
                 <div className="flex items-center gap-2 mb-3">
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-400/30 to-transparent" />
                   <span className="text-[10px] font-bold text-amber-400/80 uppercase tracking-[0.15em]">
-                    Verse of the Day
+                    {t("verseOfDay")}
                   </span>
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-400/30 to-transparent" />
                 </div>
@@ -398,12 +405,12 @@ export function VOTDCarousel({
                 ) : day.isLoading || day.imageGenerating || (day.isToday && imageLoading) ? (
                   <div className="w-full h-40 bg-gradient-to-br from-indigo-900/40 to-blue-900/40 rounded-2xl flex flex-col items-center justify-center border border-white/5">
                     <div className="size-8 border-3 border-amber-400/40 border-t-amber-400 rounded-full animate-spin mb-2" />
-                    <p className="text-xs text-blue-200/40">Creating your image...</p>
+                    <p className="text-xs text-blue-200/40">{t("creatingImage")}</p>
                   </div>
                 ) : null}
               </div>
 
-              {day.isToday && imageFailed && !day.heroImage && <button onClick={() => setImageAttempt(value => value + 1)} className="mb-3 text-sm text-amber-300 underline">Retry illustration</button>}
+              {day.isToday && imageFailed && !day.heroImage && <button onClick={() => setImageAttempt(value => value + 1)} className="mb-3 text-sm text-amber-300 underline">{t("retryIllustration")}</button>}
 
               {/* Verse Text */}
               <div className="py-4">
@@ -423,7 +430,7 @@ export function VOTDCarousel({
                 ) : day.isLoading ? (
                   <div className="flex flex-col items-center py-8">
                     <div className="size-10 border-[3px] border-amber-400 border-t-transparent rounded-full animate-spin mb-3" />
-                    <p className="text-blue-200/60 text-sm">Finding verse...</p>
+                    <p className="text-blue-200/60 text-sm">{t("findingVerse")}</p>
                   </div>
                 ) : (
                   <div className="text-center py-6">
@@ -431,7 +438,7 @@ export function VOTDCarousel({
                       <span className="material-symbols-outlined text-amber-400">cloud_off</span>
                     </div>
                     <p className="text-blue-200/50 text-sm">
-                      {day.isToday ? "Unable to load verse" : "No verse cached for this day"}
+                      {day.isToday ? t("unableLoadVerse") : t("noVerseForDay")}
                     </p>
                     {day.isToday && (
                       <button
@@ -439,7 +446,7 @@ export function VOTDCarousel({
                         className="mt-3 px-5 py-2 bg-amber-500 text-white rounded-full font-semibold text-sm active:scale-95 transition-transform flex items-center gap-2 mx-auto"
                       >
                         <span className="material-symbols-outlined text-base">refresh</span>
-                        Try Again
+                        {t("tryAgain")}
                       </button>
                     )}
                   </div>
@@ -455,9 +462,9 @@ export function VOTDCarousel({
                         <span className="material-symbols-outlined text-white text-base">auto_awesome</span>
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-white">Friendly Breakdown</h3>
+                        <h3 className="text-sm font-bold text-white">{t("friendlyBreakdown")}</h3>
                         {!canAccessPremium && (
-                          <span className="text-[9px] text-blue-200/40">Premium adds personalization.</span>
+                          <span className="text-[9px] text-blue-200/40">{t("premiumAdds")}</span>
                         )}
                       </div>
                     </div>
@@ -471,7 +478,7 @@ export function VOTDCarousel({
                       <div className="size-8 rounded-full bg-white/10 flex items-center justify-center">
                         <div className="size-4 border-2 border-amber-400/40 border-t-amber-400 rounded-full animate-spin" />
                       </div>
-                      <h3 className="text-sm font-bold text-white/40">Loading Friendly Breakdown...</h3>
+                      <h3 className="text-sm font-bold text-white/40">{t("loadingBreakdown")}</h3>
                     </div>
                     <div className="space-y-2">
                       <div className="h-3.5 bg-white/[0.06] rounded-lg animate-pulse" />
@@ -490,7 +497,7 @@ export function VOTDCarousel({
       {currentIndex === 0 && days.length > 1 && (
         <div className="flex items-center justify-center gap-1 pt-1 pb-2 animate-pulse">
           <span className="material-symbols-outlined text-blue-200/30 text-sm">swipe_left</span>
-          <span className="text-[10px] text-blue-200/25">Swipe for previous days</span>
+          <span className="text-[10px] text-blue-200/25">{t("swipePrevDays")}</span>
         </div>
       )}
     </div>
