@@ -12,8 +12,6 @@ workflows:
         NEXT_PUBLIC_API_BASE_URL: https://bibleforlifestages.com
         BUILD_TARGET: mobile
         NEXT_TELEMETRY_DISABLED: "1"
-      app_store_connect:
-        auth: integration        # Uses the App Store Connect API key you configure in Codemagic UI
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.bibleforlifestages
@@ -79,6 +77,5 @@ workflows:
 
     publishing:
       app_store_connect:
-        auth: integration
         submit_to_testflight: false
-        submit_to_app_store: false   # Flip to true once you have verified the build
+        submit_to_app_store: false
