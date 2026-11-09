@@ -5,6 +5,9 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { hapticMedium, hapticTap, nativeShare, getCachedVerseForDate, cacheVerseForDate, type CachedVerse } from "@/lib/native-features"
 import { requestVerseImage } from "@/lib/verse-image"
 import { apiUrl } from "@/lib/api-base"
+import { useLanguage, type LanguageCode } from "@/context/language-context"
+
+const DATE_LOCALES: Record<LanguageCode, string> = { en: "en-US", es: "es-MX", fr: "fr-FR", de: "de-DE", it: "it-IT", ja: "ja-JP", ko: "ko-KR", pt: "pt-BR", vi: "vi-VN", zh: "zh-CN", th: "th-TH" }
 
 interface VOTDDay {
   date: string
@@ -14,6 +17,7 @@ interface VOTDDay {
   interpretation?: string
   heroImage?: string
   isLoading: boolean
+  imageGenerating?: boolean
   isToday: boolean
 }
 
@@ -26,18 +30,19 @@ interface VOTDCarouselProps {
   canAccessPremium: boolean
   churchId?: string | null
   onRetry: () => void
+  onDayChange?: (day: { date: string; isToday: boolean; verse?: { reference: string; text: string } }) => void
 }
 
-function formatDateLabel(dateStr: string): string {
+function formatDateLabel(dateStr: string, locale = "en-US"): string {
   const date = new Date(dateStr + "T12:00:00")
-  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+  return date.toLocaleDateString(locale, { weekday: "short", month: "short", day: "numeric" })
 }
 
-function getDayLabel(dateStr: string, index: number): string {
-  if (index === 0) return "Today"
-  if (index === 1) return "Yesterday"
+function getDayLabel(dateStr: string, index: number, t: (key: string) => string, locale = "en-US"): string {
+  if (index === 0) return t("today")
+  if (index === 1) return t("yesterday")
   const date = new Date(dateStr + "T12:00:00")
-  return date.toLocaleDateString("en-US", { weekday: "long" })
+  return date.toLocaleDateString(locale, { weekday: "long" })
 }
 
 function getPastDates(count: number): string[] {
@@ -59,7 +64,10 @@ export function VOTDCarousel({
   canAccessPremium,
   churchId,
   onRetry,
+  onDayChange,
 }: VOTDCarouselProps) {
+  const { t, language } = useLanguage()
+  const locale = DATE_LOCALES[language] || "en-US"
   const [imageLoading, setImageLoading] = useState(false)
   const [imageFailed, setImageFailed] = useState(false)
   const [imageAttempt, setImageAttempt] = useState(0)
@@ -80,7 +88,7 @@ export function VOTDCarousel({
         return {
           date,
           dateLabel: formatDateLabel(date),
-          dayLabel: "Today",
+          dayLabel: "",
           verse: todayVerse,
           interpretation: todayInterpretation,
           heroImage: todayHeroImage,
@@ -93,7 +101,7 @@ export function VOTDCarousel({
       return {
         date,
         dateLabel: formatDateLabel(date),
-        dayLabel: getDayLabel(date, i),
+        dayLabel: "",
         verse: cached ? { reference: cached.reference, text: cached.text } : undefined,
         interpretation: cached?.interpretation,
         heroImage: cached?.heroImage,
@@ -134,6 +142,32 @@ export function VOTDCarousel({
     return () => { active=false; controller.abort() }
   }, [todayVerse?.reference, todayVerse?.text, todayHeroImage, imageAttempt])
 
+  // Generate (or fetch the server-cached) illustration for a previous day.
+  // The devotional API does not return artwork, so past days need this explicitly.
+  const imageRequested = useRef<Set<string>>(new Set())
+  const ensureDayImage = useCallback(async (date: string, index: number, verse: { reference: string; text: string }) => {
+    if (imageRequested.current.has(date)) return
+    imageRequested.current.add(date)
+    setDays(prev => prev.map((d, i) => i === index ? { ...d, isLoading: d.verse ? false : d.isLoading, imageGenerating: true } : d))
+    try {
+      const imageUrl = await requestVerseImage(apiUrl('/api/generate-image'), verse, new AbortController().signal)
+      if (imageUrl) {
+        setDays(prev => prev.map((d, i) => i === index ? { ...d, heroImage: imageUrl } : d))
+        const existing = getCachedVerseForDate(date)
+        cacheVerseForDate(date, {
+          reference: verse.reference,
+          text: verse.text,
+          interpretation: existing?.interpretation,
+          heroImage: imageUrl,
+        })
+      }
+    } catch {
+      // Leave the flag set so a failed day is not retried in a loop; remount retries.
+    } finally {
+      setDays(prev => prev.map((d, i) => i === index ? { ...d, imageGenerating: false } : d))
+    }
+  }, [])
+
   // Fetch a previous day's verse from API
   const fetchDayVerse = useCallback(async (date: string, index: number) => {
     if (fetchedDates.current.has(date)) return
@@ -149,6 +183,7 @@ export function VOTDCarousel({
         heroImage: cached.heroImage,
         isLoading: false,
       } : d))
+      if (!cached.heroImage) void ensureDayImage(date, index, { reference: cached.reference, text: cached.text })
       return
     }
 
@@ -170,6 +205,9 @@ export function VOTDCarousel({
 
       // Update immediately with verse
       setDays(prev => prev.map((d, i) => i === index ? { ...d, verse, isLoading: false } : d))
+
+      // Start artwork in parallel with the devotional text
+      void ensureDayImage(date, index, verse)
 
       // Try to get cached devotional content for this verse
       const profileRaw = localStorage.getItem("userProfile")
@@ -198,22 +236,23 @@ export function VOTDCarousel({
         setDays(prev => prev.map((d, i) => i === index ? {
           ...d,
           interpretation,
-          heroImage,
+          heroImage: heroImage || d.heroImage,
         } : d))
 
-        // Cache for future
+        // Cache for future (keep any artwork that finished first)
+        const existing = getCachedVerseForDate(date)
         cacheVerseForDate(date, {
           reference: verse.reference,
           text: verse.text,
           interpretation,
-          heroImage,
+          heroImage: heroImage || existing?.heroImage,
         })
       }
     } catch (e) {
       console.error(`[VOTDCarousel] Failed to fetch verse for ${date}:`, e)
       setDays(prev => prev.map((d, i) => i === index ? { ...d, isLoading: false } : d))
     }
-  }, [churchId])
+  }, [churchId, ensureDayImage])
 
   // Prefetch adjacent days when index changes
   useEffect(() => {
@@ -221,12 +260,17 @@ export function VOTDCarousel({
     if (currentIndex > 0 && !days[currentIndex]?.verse) {
       fetchDayVerse(dates[currentIndex], currentIndex)
     }
+    // Verse loaded from cache without artwork: generate it
+    const cur = days[currentIndex]
+    if (currentIndex > 0 && cur?.verse && !cur.heroImage) {
+      void ensureDayImage(dates[currentIndex], currentIndex, cur.verse)
+    }
     // Prefetch next day too
     const nextIdx = currentIndex + 1
     if (nextIdx < TOTAL_DAYS && !days[nextIdx]?.verse) {
       fetchDayVerse(dates[nextIdx], nextIdx)
     }
-  }, [currentIndex, days, dates, fetchDayVerse])
+  }, [currentIndex, days, dates, fetchDayVerse, ensureDayImage])
 
   // Touch handlers for swipe
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -281,6 +325,13 @@ export function VOTDCarousel({
   }
 
   const day = days[currentIndex]
+  const dayLabelText = getDayLabel(dates[currentIndex], currentIndex, t, locale)
+  const dateLabelText = day ? formatDateLabel(day.date, locale) : ""
+
+  useEffect(() => {
+    if (!day || !onDayChange) return
+    onDayChange({ date: day.date, isToday: day.isToday, verse: day.verse })
+  }, [day?.date, day?.isToday, day?.verse?.reference, day?.verse?.text]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="relative">
@@ -288,10 +339,10 @@ export function VOTDCarousel({
       <div className="px-5 pb-2">
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs font-semibold text-amber-400/80">
-            {day?.dayLabel || "Today"}
+            {day ? dayLabelText : t("today")}
           </p>
           <p className="text-[10px] text-blue-200/40">
-            {day?.dateLabel}
+            {dateLabelText}
           </p>
         </div>
         <div className="flex items-center justify-center gap-1.5">
@@ -330,7 +381,7 @@ export function VOTDCarousel({
                 <div className="flex items-center gap-2 mb-3">
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-400/30 to-transparent" />
                   <span className="text-[10px] font-bold text-amber-400/80 uppercase tracking-[0.15em]">
-                    Verse of the Day
+                    {t("verseOfDay")}
                   </span>
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-400/30 to-transparent" />
                 </div>
@@ -351,15 +402,15 @@ export function VOTDCarousel({
                       <span className="material-symbols-outlined text-white text-lg">share</span>
                     </button>
                   </div>
-                ) : day.isLoading || (day.isToday && imageLoading) ? (
+                ) : day.isLoading || day.imageGenerating || (day.isToday && imageLoading) ? (
                   <div className="w-full h-40 bg-gradient-to-br from-indigo-900/40 to-blue-900/40 rounded-2xl flex flex-col items-center justify-center border border-white/5">
                     <div className="size-8 border-3 border-amber-400/40 border-t-amber-400 rounded-full animate-spin mb-2" />
-                    <p className="text-xs text-blue-200/40">Creating your image...</p>
+                    <p className="text-xs text-blue-200/40">{t("creatingImage")}</p>
                   </div>
                 ) : null}
               </div>
 
-              {day.isToday && imageFailed && !day.heroImage && <button onClick={() => setImageAttempt(value => value + 1)} className="mb-3 text-sm text-amber-300 underline">Retry illustration</button>}
+              {day.isToday && imageFailed && !day.heroImage && <button onClick={() => setImageAttempt(value => value + 1)} className="mb-3 text-sm text-amber-300 underline">{t("retryIllustration")}</button>}
 
               {/* Verse Text */}
               <div className="py-4">
@@ -379,7 +430,7 @@ export function VOTDCarousel({
                 ) : day.isLoading ? (
                   <div className="flex flex-col items-center py-8">
                     <div className="size-10 border-[3px] border-amber-400 border-t-transparent rounded-full animate-spin mb-3" />
-                    <p className="text-blue-200/60 text-sm">Finding verse...</p>
+                    <p className="text-blue-200/60 text-sm">{t("findingVerse")}</p>
                   </div>
                 ) : (
                   <div className="text-center py-6">
@@ -387,7 +438,7 @@ export function VOTDCarousel({
                       <span className="material-symbols-outlined text-amber-400">cloud_off</span>
                     </div>
                     <p className="text-blue-200/50 text-sm">
-                      {day.isToday ? "Unable to load verse" : "No verse cached for this day"}
+                      {day.isToday ? t("unableLoadVerse") : t("noVerseForDay")}
                     </p>
                     {day.isToday && (
                       <button
@@ -395,7 +446,7 @@ export function VOTDCarousel({
                         className="mt-3 px-5 py-2 bg-amber-500 text-white rounded-full font-semibold text-sm active:scale-95 transition-transform flex items-center gap-2 mx-auto"
                       >
                         <span className="material-symbols-outlined text-base">refresh</span>
-                        Try Again
+                        {t("tryAgain")}
                       </button>
                     )}
                   </div>
@@ -411,9 +462,9 @@ export function VOTDCarousel({
                         <span className="material-symbols-outlined text-white text-base">auto_awesome</span>
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-white">Friendly Breakdown</h3>
+                        <h3 className="text-sm font-bold text-white">{t("friendlyBreakdown")}</h3>
                         {!canAccessPremium && (
-                          <span className="text-[9px] text-blue-200/40">Premium adds personalization.</span>
+                          <span className="text-[9px] text-blue-200/40">{t("premiumAdds")}</span>
                         )}
                       </div>
                     </div>
@@ -427,7 +478,7 @@ export function VOTDCarousel({
                       <div className="size-8 rounded-full bg-white/10 flex items-center justify-center">
                         <div className="size-4 border-2 border-amber-400/40 border-t-amber-400 rounded-full animate-spin" />
                       </div>
-                      <h3 className="text-sm font-bold text-white/40">Loading Friendly Breakdown...</h3>
+                      <h3 className="text-sm font-bold text-white/40">{t("loadingBreakdown")}</h3>
                     </div>
                     <div className="space-y-2">
                       <div className="h-3.5 bg-white/[0.06] rounded-lg animate-pulse" />
@@ -446,7 +497,7 @@ export function VOTDCarousel({
       {currentIndex === 0 && days.length > 1 && (
         <div className="flex items-center justify-center gap-1 pt-1 pb-2 animate-pulse">
           <span className="material-symbols-outlined text-blue-200/30 text-sm">swipe_left</span>
-          <span className="text-[10px] text-blue-200/25">Swipe for previous days</span>
+          <span className="text-[10px] text-blue-200/25">{t("swipePrevDays")}</span>
         </div>
       )}
     </div>

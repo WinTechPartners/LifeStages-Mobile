@@ -20,7 +20,7 @@ import {
 export default function MobileHome() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { devotional, userName, isLoading, loadingStates, generateDevotional } = useDevotional()
+  const { devotional, userName, isLoading, loadingStates, generateDevotional, generateForVerse, generateForPastVerse } = useDevotional()
   const { canAccessPremium, canStartTrial } = useSubscription()
   const { t, language } = useLanguage()
   const { hasChurch, church, lastSermon, thisSermon, logo, showSermonRow, isLoading: churchLoading } = useChurch()
@@ -30,6 +30,28 @@ export default function MobileHome() {
   const [offlineVerse, setOfflineVerse] = useState<any>(null)
   const [pushAsked, setPushAsked] = useState(false)
   const [userProfile, setUserProfile] = useState<any>(null)
+  const [selectedDay, setSelectedDay] = useState<{ date: string; isToday: boolean; verse?: { reference: string; text: string } } | null>(null)
+  const [openingDeeper, setOpeningDeeper] = useState(false)
+
+  // If the shared devotional still holds a previous day's verse, restore today's.
+  useEffect(() => {
+    if (devotional.source?.startsWith("Past:") && !openingDeeper && !isLoading) {
+      void generateForVerse("YouVersion")
+    }
+  }, [devotional.source, openingDeeper, isLoading, generateForVerse])
+
+  const handleGoDeeper = async () => {
+    hapticSuccess()
+    if (selectedDay && !selectedDay.isToday && selectedDay.verse) {
+      setOpeningDeeper(true)
+      try {
+        await generateForPastVerse({ ...selectedDay.verse, version: "NIV" }, selectedDay.date)
+      } finally {
+        setOpeningDeeper(false)
+      }
+    }
+    router.push("/verse")
+  }
 
   // Initialize native features
   useEffect(() => {
@@ -319,20 +341,22 @@ export default function MobileHome() {
           canAccessPremium={canAccessPremium}
           churchId={church?.id}
           onRetry={handleRetry}
+          onDayChange={setSelectedDay}
         />
 
         {/* Go Deeper CTA (for premium users) */}
         {displayVerse && canAccessPremium && (
           <div className="px-5 pt-2 pb-4">
             <button
-              onClick={() => { hapticSuccess(); router.push("/verse") }}
+              onClick={handleGoDeeper}
+              disabled={openingDeeper}
               className="w-full relative overflow-hidden py-4 rounded-2xl font-bold text-lg text-white shadow-xl active:scale-[0.97] transition-transform"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 animate-gradient-x" />
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.15),transparent_60%)]" />
               <div className="relative flex items-center justify-center gap-2">
                 <span className="material-symbols-outlined text-xl">auto_awesome</span>
-                Go Deeper
+                {openingDeeper ? t("loading") : selectedDay && !selectedDay.isToday && selectedDay.verse ? t("goDeeperOn").replace("{ref}", selectedDay.verse.reference) : t("goDeeper")}
               </div>
             </button>
           </div>
