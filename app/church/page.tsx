@@ -1262,7 +1262,7 @@ export default function ChurchLandingPage() {
                   The Moment Everything Changed
                 </h4>
                 <p className="text-blue-200/80 text-sm leading-relaxed">
-                  In that darkest moment, Steve picked up his phone to find a way to end his life. He saw a Bible app and took it as a sign from God. He opened it. The verse was about tithing. That made him mad, and what struck him was this:
+                  In that darkest moment, Steve picked up his phone to find a way to end his life. He saw a Bible app and took it as a sign from God. He opened it. The verse was about tithing. That frustrated him, and what struck him was this:
                 </p>
                 <blockquote className="my-4 pl-4 border-l-2 border-amber-400/50">
                   <p className="text-white text-sm italic leading-relaxed">
